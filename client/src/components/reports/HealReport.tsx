@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Zap, Shield, FileCode, ArrowRight, BrainCircuit, X } from 'lucide-react'
@@ -38,9 +38,11 @@ interface DiffPopoverProps {
   patch: HealPatch
   buttonRect: DOMRect
   onClose: () => void
+  onMouseEnter: () => void
+  onMouseLeave: () => void
 }
 
-function DiffPopover({ patch, buttonRect, onClose }: DiffPopoverProps) {
+function DiffPopover({ patch, buttonRect, onClose, onMouseEnter, onMouseLeave }: DiffPopoverProps) {
   const diffLines = computeSimpleDiff(patch.original ?? '', patch.patched ?? '')
   const popoverRef = useRef<HTMLDivElement>(null)
 
@@ -64,6 +66,8 @@ function DiffPopover({ patch, buttonRect, onClose }: DiffPopoverProps) {
       style={{ position: 'fixed', top, left, width: popoverWidth, zIndex: 9999 }}
       className="bg-[#0D0D0D] border border-[#1A1A1A] rounded-xl shadow-2xl flex flex-col overflow-hidden"
       onClick={(e) => e.stopPropagation()}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#1A1A1A]">
         <div className="flex items-center gap-2 text-[10px] font-mono text-gray-300">
@@ -113,22 +117,42 @@ export function HealReport({ data }: Props) {
   const setActiveDiffView = usePipelineStore((s) => s.setActiveDiffView)
   const patches = data?.patches ?? []
   const compliancePatches = patches.filter((p) => p.fixesViolation)
-  const [hoveredPatch, setHoveredPatch] = useState<{ patch: HealPatch; rect: DOMRect } | null>(null)
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [hoveredPatch, setHoveredPatch] = useState<{ patch: HealPatch; rect: DOMRect; index: number } | null>(null)
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleMouseEnter = useCallback((patch: HealPatch, e: React.MouseEvent) => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-    hoverTimerRef.current = setTimeout(() => {
-      const btn = (e.currentTarget as HTMLElement).closest('button')
-      if (btn) {
-        setHoveredPatch({ patch, rect: btn.getBoundingClientRect() })
-      }
+  useEffect(() => {
+    return () => {
+      if (showTimerRef.current) clearTimeout(showTimerRef.current)
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+    }
+  }, [])
+
+  const handleMouseEnter = useCallback((patch: HealPatch, index: number, e: React.MouseEvent) => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+    if (showTimerRef.current) clearTimeout(showTimerRef.current)
+    const btn = (e.currentTarget as HTMLElement).closest('button')
+    if (!btn) return
+    showTimerRef.current = setTimeout(() => {
+      setHoveredPatch({ patch, rect: btn.getBoundingClientRect(), index })
     }, 200)
   }, [])
 
   const handleMouseLeave = useCallback(() => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-    setHoveredPatch(null)
+    if (showTimerRef.current) clearTimeout(showTimerRef.current)
+    hideTimerRef.current = setTimeout(() => {
+      setHoveredPatch(null)
+    }, 200)
+  }, [])
+
+  const handlePopoverEnter = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+  }, [])
+
+  const handlePopoverLeave = useCallback(() => {
+    hideTimerRef.current = setTimeout(() => {
+      setHoveredPatch(null)
+    }, 150)
   }, [])
 
   return (
@@ -174,7 +198,7 @@ export function HealReport({ data }: Props) {
                 )}
                 <motion.button
                   onClick={() => setActiveDiffView(true)}
-                  onMouseEnter={(e) => handleMouseEnter(patch, e)}
+                  onMouseEnter={(e) => handleMouseEnter(patch, i, e)}
                   onMouseLeave={handleMouseLeave}
                   className="relative flex items-center gap-1 text-[9px] font-mono px-2 py-1 rounded bg-[#1A1A1A] text-[#FF6B00] hover:bg-[#FF6B00]/10 transition-colors"
                   whileTap={{ scale: 0.95 }}
@@ -219,9 +243,12 @@ export function HealReport({ data }: Props) {
       <AnimatePresence>
         {hoveredPatch && (
           <DiffPopover
+            key={hoveredPatch.index}
             patch={hoveredPatch.patch}
             buttonRect={hoveredPatch.rect}
             onClose={() => setHoveredPatch(null)}
+            onMouseEnter={handlePopoverEnter}
+            onMouseLeave={handlePopoverLeave}
           />
         )}
       </AnimatePresence>

@@ -58,9 +58,46 @@ function parseAnalyze(output: string): AnalyzeData | null {
 }
 
 function parseCompliance(output: string): ComplianceFinding[] | null {
-  const json = extractFirstJson<{ findings?: ComplianceFinding[] }>(output)
-  if (!json?.findings) return null
-  return json.findings
+  const json = extractFirstJson<{
+    findings?: ComplianceFinding[]
+    violations?: Array<{ article: string; severity?: string; finding?: string; remediation?: string }>
+    passedChecks?: Array<{ article: string; description?: string }>
+  }>(output)
+  if (!json) return null
+
+  if (json.findings) return json.findings
+
+  const results: ComplianceFinding[] = []
+
+  if (json.passedChecks) {
+    for (const c of json.passedChecks) {
+      results.push({
+        severity: 'Low',
+        article: c.article ?? '',
+        title: c.description ?? '',
+        description: c.description ?? '',
+        passed: true,
+      })
+    }
+  }
+
+  if (json.violations) {
+    for (const v of json.violations) {
+      const sev = (v.severity ?? 'medium').toLowerCase()
+      const severity = (sev.charAt(0).toUpperCase() + sev.slice(1)) as ComplianceFinding['severity']
+      results.push({
+        severity: ['Critical', 'High', 'Medium', 'Low'].includes(severity) ? severity : 'Medium',
+        article: v.article ?? '',
+        title: v.finding ?? '',
+        description: v.finding ?? '',
+        passed: false,
+        remediation: v.remediation,
+      })
+    }
+  }
+
+  if (json.violations !== undefined || json.passedChecks !== undefined) return results
+  return null
 }
 
 function parseLayout(output: string): LayoutData | null {

@@ -44,6 +44,28 @@ export function extractFirstJson<T = Record<string, unknown>>(output: string): T
   if (parsed.jsonBlocks.length > 0) {
     return parsed.jsonBlocks[0] as T
   }
+
+  const jsonCodeBlockRE = /```(?:json)?\s*\n([\s\S]*?)```/gi
+  let match: RegExpExecArray | null
+  while ((match = jsonCodeBlockRE.exec(output)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim()) as T
+      if (parsed && typeof parsed === 'object') return parsed
+    } catch {
+      // try next block
+    }
+  }
+
+  const standaloneRE = /\{[\s\S]*?"\w+"[\s\S]*?\}/g
+  while ((match = standaloneRE.exec(output)) !== null) {
+    try {
+      const parsed = JSON.parse(match[0]) as T
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed as object).length > 1) return parsed
+    } catch {
+      // try next match
+    }
+  }
+
   return null
 }
 

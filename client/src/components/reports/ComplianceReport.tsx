@@ -33,10 +33,14 @@ export function ComplianceReport({ data }: Props) {
       className="space-y-3"
     >
       <div className="flex items-center gap-2 p-3 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A]">
-        <Shield size={16} className={passed === total && total > 0 ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
-        <span className="text-xs font-mono text-gray-300">
-          {passed}/{total} passed
-        </span>
+        <Shield size={16} className={total > 0 ? (passed === total ? 'text-[#33FF77]' : 'text-[#FF3333]') : 'text-gray-500'} />
+        {total > 0 ? (
+          <span className="text-xs font-mono text-gray-300">
+            {passed}/{total} passed
+          </span>
+        ) : (
+          <span className="text-xs font-mono text-gray-500">No findings available</span>
+        )}
         {passed === total && total > 0 ? (
           <span className="text-[10px] font-mono text-[#33FF77] ml-auto">GDPR Compliant</span>
         ) : total > 0 ? (
@@ -79,7 +83,7 @@ export function ComplianceReport({ data }: Props) {
           </div>
         ))}
         {findings.length === 0 && (
-          <p className="text-xs text-gray-500 px-3 py-3">No compliance findings</p>
+          <p className="text-xs text-gray-500 px-3 py-3">The AI output could not be parsed into compliance findings. The raw agent output may still contain compliance information.</p>
         )}
       </div>
     </motion.div>

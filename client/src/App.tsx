@@ -10,7 +10,7 @@ import { useMockPipeline } from './hooks/useMockPipeline'
 export default function App() {
   const assurance = useToggle(false)
   const { agents: agentProgress, update: updateAgent } = useAgentProgress()
-  const { result, running, execute } = useMockPipeline()
+  const { result, running, pipelineStatus, currentAgent, agentIndex, execute } = useMockPipeline()
 
   const handleSend = (text: string) => {
     execute(text, (id, pct, status) => {
@@ -21,7 +21,13 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-[#050505] overflow-hidden">
       <Sidebar agentProgress={agentProgress} />
-      <Header onToggleAssurance={assurance.toggle} assuranceOpen={assurance.on} />
+      <Header
+        onToggleAssurance={assurance.toggle}
+        assuranceOpen={assurance.on}
+        pipelineStatus={pipelineStatus}
+        currentAgent={currentAgent}
+        agentIndex={agentIndex}
+      />
 
       <div className="flex flex-1 pt-12 ml-16 min-h-0">
         <Workspace result={result} />

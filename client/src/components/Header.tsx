@@ -1,11 +1,9 @@
 import { motion } from 'framer-motion'
-import { FileDown, PanelRightClose } from 'lucide-react'
+import { FileDown } from 'lucide-react'
 import { PipelineStatus } from './PipelineStatus'
 import type { AgentId } from '@shared/types'
 
 interface Props {
-  onToggleAssurance: () => void
-  assuranceOpen: boolean
   pipelineStatus: 'idle' | 'running' | 'complete' | 'error'
   currentAgent?: AgentId
   agentIndex?: number
@@ -13,8 +11,6 @@ interface Props {
 }
 
 export function Header({
-  onToggleAssurance,
-  assuranceOpen,
   pipelineStatus,
   currentAgent,
   agentIndex,
@@ -44,14 +40,6 @@ export function Header({
         >
           <FileDown size={13} />
           Export Official PDF
-        </motion.button>
-        <motion.button
-          onClick={onToggleAssurance}
-          className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-md text-gray-400 hover:text-white transition-colors"
-          whileTap={{ scale: 0.95 }}
-          animate={{ rotate: assuranceOpen ? 180 : 0 }}
-        >
-          <PanelRightClose size={14} />
         </motion.button>
       </div>
     </header>

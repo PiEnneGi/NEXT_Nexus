@@ -31,14 +31,6 @@ export default function App() {
     exportPipelinePDF(state.result, state.agentReports, input)
   }, [])
 
-  const handleToggleAssurance = useCallback(() => {
-    if (isAssuranceOpen) {
-      selectAgent(null)
-    } else {
-      toggleAssurance()
-    }
-  }, [isAssuranceOpen, selectAgent, toggleAssurance])
-
   return (
     <div className="h-screen flex flex-col bg-[#050505] overflow-hidden">
       <Sidebar
@@ -47,8 +39,6 @@ export default function App() {
         onAgentClick={selectAgent}
       />
       <Header
-        onToggleAssurance={handleToggleAssurance}
-        assuranceOpen={isAssuranceOpen}
         pipelineStatus={pipelineStatus}
         currentAgent={currentAgentId ?? undefined}
         agentIndex={currentAgentIndex}
@@ -69,7 +59,6 @@ export default function App() {
           validation={result?.validation ?? null}
           selectedAgentId={selectedAgentId}
           agentReports={agentReports}
-          onClose={() => selectAgent(null)}
           resultCode={result?.code}
           onShowMermaid={() => {
             selectAgent(null)

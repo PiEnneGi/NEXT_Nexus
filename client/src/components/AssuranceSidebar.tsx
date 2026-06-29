@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, CheckCircle, AlertTriangle, XCircle, ArrowLeft, Code, LayoutDashboard, Globe, Terminal, BookOpen, Files, FileText, Lock, KeyRound, Network, Ban, Fingerprint, FileWarning } from 'lucide-react'
+import { Shield, CheckCircle, AlertTriangle, XCircle, Code, LayoutDashboard, Globe, Terminal, BookOpen, Files, FileText, Lock, KeyRound, Network, Ban, Fingerprint, FileWarning } from 'lucide-react'
 import type { ComplianceReport, SecurityReport, ValidationReport, AgentReport, AgentId, DocsData, HardenerData } from '@shared/types'
 import { AnalyzeReport } from './reports/AnalyzeReport'
 import { ComplianceReport as ComplianceReportView } from './reports/ComplianceReport'
@@ -29,7 +29,6 @@ interface Props {
   validation: ValidationReport | null
   selectedAgentId: AgentId | null
   agentReports: Partial<Record<AgentId, AgentReport>>
-  onClose: () => void
   resultCode?: string
   onShowMermaid?: () => void
   onShowDiff?: () => void
@@ -345,7 +344,6 @@ export function AssuranceSidebar({
   validation,
   selectedAgentId,
   agentReports,
-  onClose,
   resultCode,
   onShowMermaid,
   onShowDiff,
@@ -415,15 +413,7 @@ export function AssuranceSidebar({
           {selectedAgentId ? (
             <>
               <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1A1A1A]">
-                <motion.button
-                  onClick={onClose}
-                  className="flex items-center gap-1 text-[10px] font-mono text-gray-400 hover:text-white transition-colors"
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <ArrowLeft size={12} />
-                  Back
-                </motion.button>
-                <span className="text-[11px] font-mono text-[#FF6B00] ml-auto">
+                <span className="text-[11px] font-mono text-[#FF6B00]">
                   {AGENT_LABELS[selectedAgentId]}
                 </span>
               </div>

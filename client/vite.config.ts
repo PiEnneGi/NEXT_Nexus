@@ -10,4 +10,12 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, '../shared'),
     },
   },
+  server: {
+    proxy: {
+      '/stream': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
+  },
 })

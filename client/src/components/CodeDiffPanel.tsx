@@ -1,22 +1,30 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { DiffLine } from '@shared/types'
+import { DiffView } from './DiffView'
 
 interface Props {
   code: string | null
   diffLines: DiffLine[] | null
   streamedCode: string
+  defaultTab?: 'code' | 'diff'
 }
 
-export function CodeDiffPanel({ code, diffLines, streamedCode }: Props) {
+export function CodeDiffPanel({ code, diffLines, streamedCode, defaultTab }: Props) {
   const [tab, setTab] = useState<'code' | 'diff'>('code')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (defaultTab) {
+      setTab(defaultTab)
+    }
+  }, [defaultTab])
+
+  useEffect(() => {
+    if (scrollRef.current && tab === 'code') {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [streamedCode])
+  }, [streamedCode, tab])
 
   const displayCode = streamedCode || code || '// No code generated yet'
 
@@ -64,30 +72,11 @@ export function CodeDiffPanel({ code, diffLines, streamedCode }: Props) {
               exit={{ opacity: 0, x: 10 }}
             >
               {diffLines && diffLines.length > 0 ? (
-                diffLines.map((line, i) => {
-                  const bg =
-                    line.type === 'added'
-                      ? 'bg-[#33FF77]/10'
-                      : line.type === 'removed'
-                        ? 'bg-[#FF3333]/10'
-                        : ''
-                  const color =
-                    line.type === 'added'
-                      ? 'text-[#33FF77]'
-                      : line.type === 'removed'
-                        ? 'text-[#FF3333]'
-                        : 'text-gray-400'
-                  return (
-                    <div key={i} className={`flex ${bg} rounded px-2`}>
-                      <span className="w-8 text-gray-600 select-none text-right mr-3">
-                        {line.lineNumber}
-                      </span>
-                      <span className={color}>{line.content}</span>
-                    </div>
-                  )
-                })
+                <DiffView lines={diffLines} />
               ) : (
-                <div className="text-gray-600">No diffs available</div>
+                <div className="flex items-center justify-center h-24 text-gray-600 text-xs">
+                  No diffs available
+                </div>
               )}
             </motion.div>
           )}

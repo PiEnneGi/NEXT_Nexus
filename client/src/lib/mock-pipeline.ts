@@ -215,6 +215,7 @@ export function startMockPipeline(
       const allCode = AGENT_ORDER.flatMap((id) => AGENT_CODE_LINES[id]).join('\n')
       onComplete({
         diagramSvg: MOCK_DIAGRAM,
+        diagramMermaid: null,
         code: allCode,
         diffLines: MOCK_DIFF,
         compliance: {
@@ -223,6 +224,7 @@ export function startMockPipeline(
         },
         security: { passed: 14, failed: 0, warnings: ['Review ALB access logs retention', 'Enable AWS Config rules'] },
         validation: { valid: true, errors: [] },
+        agentReports: {},
       })
       return
     }

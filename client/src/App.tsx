@@ -4,7 +4,6 @@ import { Workspace } from './components/Workspace'
 import { CommandBar } from './components/CommandBar'
 import { AssuranceSidebar } from './components/AssuranceSidebar'
 import { usePipelineStore } from './hooks/usePipelineStore'
-import { startMockPipeline } from './lib/mock-pipeline'
 
 export default function App() {
   const agentsState = usePipelineStore((s) => s.agentsState)
@@ -14,36 +13,20 @@ export default function App() {
   const streamedCode = usePipelineStore((s) => s.streamedCode)
   const result = usePipelineStore((s) => s.result)
   const isAssuranceOpen = usePipelineStore((s) => s.isAssuranceOpen)
+  const selectedAgentId = usePipelineStore((s) => s.selectedAgentId)
+  const agentReports = usePipelineStore((s) => s.agentReports)
+  const activeDiffView = usePipelineStore((s) => s.activeDiffView)
   const toggleAssurance = usePipelineStore((s) => s.toggleAssurance)
-  const updateAgent = usePipelineStore((s) => s.updateAgent)
-  const addCodeLine = usePipelineStore((s) => s.addCodeLine)
-  const setResult = usePipelineStore((s) => s.setResult)
-  const setPipelineStatus = usePipelineStore((s) => s.setPipelineStatus)
-  const setCurrentAgent = usePipelineStore((s) => s.setCurrentAgent)
-  const reset = usePipelineStore((s) => s.reset)
-
-  const startPipeline = (input: string) => {
-    reset()
-    setPipelineStatus('running')
-
-    startMockPipeline(
-      (line) => addCodeLine(line),
-      (id, pct, status) => {
-        if (status === 'working' && usePipelineStore.getState().currentAgentId !== id) {
-          setCurrentAgent(id, AGENT_ORDER.indexOf(id) + 1)
-        }
-        updateAgent(id, pct, status as 'idle' | 'working' | 'done' | 'error')
-      },
-      (archResult) => {
-        setResult(archResult)
-        setPipelineStatus('complete')
-      },
-    )
-  }
+  const selectAgent = usePipelineStore((s) => s.selectAgent)
+  const startPipeline = usePipelineStore((s) => s.startPipeline)
 
   return (
     <div className="h-screen flex flex-col bg-[#050505] overflow-hidden">
-      <Sidebar agentProgress={agentsState} />
+      <Sidebar
+        agentProgress={agentsState}
+        selectedAgentId={selectedAgentId}
+        onAgentClick={selectAgent}
+      />
       <Header
         onToggleAssurance={toggleAssurance}
         assuranceOpen={isAssuranceOpen}
@@ -53,12 +36,19 @@ export default function App() {
       />
 
       <div className="flex flex-1 pt-12 ml-16 min-h-0">
-        <Workspace result={result} streamedCode={streamedCode} />
+        <Workspace
+          result={result}
+          streamedCode={streamedCode}
+          activeDiffView={activeDiffView}
+        />
         <AssuranceSidebar
           open={isAssuranceOpen}
           compliance={result?.compliance ?? null}
           security={result?.security ?? null}
           validation={result?.validation ?? null}
+          selectedAgentId={selectedAgentId}
+          agentReports={agentReports}
+          onClose={() => selectAgent(null)}
         />
       </div>
 
@@ -66,5 +56,3 @@ export default function App() {
     </div>
   )
 }
-
-const AGENT_ORDER = ['search', 'layout', 'codeXml', 'shieldCheck', 'zap', 'lock', 'fileText', 'clipboardCheck'] as const

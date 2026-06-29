@@ -12,49 +12,38 @@ export function downloadSVG(svgContent: string, filename = 'architecture.svg') {
   URL.revokeObjectURL(url)
 }
 
-export function downloadPNG(
+export async function downloadPNG(
   elementOrSvg: HTMLElement | SVGElement | string,
   filename = 'architecture.png',
   scale = 2,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (typeof elementOrSvg === 'string') {
-      const img = new Image()
-      const blob = new Blob([elementOrSvg], { type: 'image/svg+xml' })
-      const url = URL.createObjectURL(blob)
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width * scale
-        canvas.height = img.height * scale
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { reject(new Error('Canvas context unavailable')); return }
-        ctx.scale(scale, scale)
-        ctx.drawImage(img, 0, 0)
-        canvas.toBlob((b) => {
-          if (b) {
-            const a = document.createElement('a')
-            a.href = URL.createObjectURL(b)
-            a.download = filename
-            a.click()
-            resolve()
-          } else {
-            reject(new Error('Canvas toBlob failed'))
-          }
-        }, 'image/png')
-      }
-      img.onerror = () => reject(new Error('Image load failed'))
-      img.src = url
-    } else {
-      const serializer = new XMLSerializer()
-      const svgString = serializer.serializeToString(elementOrSvg)
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
-      const url = URL.createObjectURL(svgBlob)
+  if (typeof elementOrSvg !== 'string') {
+    const canvas = await html2canvas(elementOrSvg as HTMLElement, {
+      scale,
+      backgroundColor: '#050505',
+      useCORS: true,
+      logging: false,
+    })
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'))
+    if (!blob) throw new Error('Canvas toBlob failed')
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(a.href)
+    return
+  }
 
-      const img = new Image()
+  const img = new Image()
+  const blob = new Blob([elementOrSvg], { type: 'image/svg+xml' })
+  const url = URL.createObjectURL(blob)
+
+  try {
+    await new Promise<void>((resolve, reject) => {
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        canvas.width = img.width * scale
-        canvas.height = img.height * scale
+        canvas.width = Math.max(img.width, 1) * scale
+        canvas.height = Math.max(img.height, 1) * scale
         const ctx = canvas.getContext('2d')
         if (!ctx) { reject(new Error('Canvas context unavailable')); return }
         ctx.scale(scale, scale)
@@ -65,20 +54,19 @@ export function downloadPNG(
             a.href = URL.createObjectURL(b)
             a.download = filename
             a.click()
+            URL.revokeObjectURL(a.href)
             resolve()
           } else {
             reject(new Error('Canvas toBlob failed'))
           }
         }, 'image/png')
-        URL.revokeObjectURL(url)
       }
-      img.onerror = () => {
-        URL.revokeObjectURL(url)
-        reject(new Error('SVG image load failed (foreignObject may not render)'))
-      }
+      img.onerror = () => reject(new Error('SVG image load failed'))
       img.src = url
-    }
-  })
+    })
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
 
 export async function downloadPDF(

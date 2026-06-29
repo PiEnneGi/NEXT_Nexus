@@ -206,11 +206,14 @@ export function ArchitecturePanel({ diagramSvg, diagramMermaid }: Props) {
   }
 
   const handleExportPNG = async () => {
-    const domSvg = getDomSvg()
-    if (domSvg) {
-      await downloadPNG(domSvg)
-    } else if (renderedSvg) {
-      await downloadPNG(renderedSvg)
+    try {
+      if (svgContainerRef.current) {
+        await downloadPNG(svgContainerRef.current)
+      } else if (renderedSvg) {
+        await downloadPNG(renderedSvg)
+      }
+    } catch (err) {
+      console.error('[PNG Export] Failed:', err)
     }
   }
 

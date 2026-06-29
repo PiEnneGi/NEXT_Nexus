@@ -6,7 +6,7 @@ export interface ParsedAgentOutput {
 }
 
 const JSON_BLOCK_RE = /<json\s*>([\s\S]*?)<\/json\s*>/gi
-const CODE_BLOCK_RE = /```(\w+)?\s*\n([\s\S]*?)```/gi
+const CODE_BLOCK_RE = /```(\w+)?[^\n]*\n([\s\S]*?)```/gi
 const MERMAID_BLOCK_RE = /```mermaid\s*\n([\s\S]*?)```/gi
 
 export function parseAgentOutput(output: string): ParsedAgentOutput {

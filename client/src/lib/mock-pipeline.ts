@@ -2,6 +2,7 @@ import type {
   AgentId,
   ArchitectureResult,
   DiffLine,
+  AgentReport,
 } from '@shared/types'
 
 const AGENT_CODE_LINES: Record<AgentId, string[]> = {
@@ -209,6 +210,82 @@ export function startMockPipeline(
     { type: 'removed', content: '- # TODO: add WAF rules', lineNumber: 7 },
   ]
 
+  const MOCK_AGENT_REPORTS: Partial<Record<AgentId, AgentReport>> = {
+    search: {
+      agentId: 'search', agentName: 'Analyze', type: 'analyze',
+      data: {
+        requirements: [
+          { name: 'High Availability', value: 'Multi-AZ deployment with auto-scaling', priority: 'P0' },
+          { name: 'Security', value: 'Encryption at rest and in transit', priority: 'P0' },
+          { name: 'Scalability', value: 'Horizontal scaling with load balancer', priority: 'P1' },
+        ],
+        rpo: '1 hour', rto: '15 minutes',
+        services: ['AWS VPC', 'ECS', 'RDS', 'ALB', 'ElastiCache'],
+      },
+    },
+    layout: {
+      agentId: 'layout', agentName: 'Design', type: 'layout',
+      data: {
+        architecture: 'Multi-AZ VPC with public/private subnets across 3 AZs',
+        services: ['VPC', 'ECS', 'RDS', 'ALB', 'ElastiCache'],
+        zones: 3,
+      },
+    },
+    codeXml: {
+      agentId: 'codeXml', agentName: 'Code/XML', type: 'codeXml',
+      data: { code: '', language: 'hcl', modules: [{ name: 'vpc', type: 'network' }, { name: 'ecs_cluster', type: 'compute' }, { name: 'rds_instance', type: 'database' }] },
+    },
+    shieldCheck: {
+      agentId: 'shieldCheck', agentName: 'Compliance', type: 'compliance',
+      data: [
+        { severity: 'High', article: 'GDPR-32', title: 'Data encryption at rest', description: 'Ensure KMS encryption enabled for all data stores', passed: true, remediation: 'Enable KMS' },
+        { severity: 'High', article: 'GDPR-33', title: 'Access logging enabled', description: 'CloudTrail must be enabled for audit logging', passed: true, remediation: 'Enable CloudTrail' },
+        { severity: 'Medium', article: 'GDPR-25', title: 'Data isolation via VPC', description: 'Resources must be deployed in isolated VPC', passed: true },
+      ],
+    },
+    zap: {
+      agentId: 'zap', agentName: 'Auto-Heal', type: 'heal',
+      data: {
+        patches: [
+          { file: 'main.tf', original: 'instance_type = "t2.micro"', patched: 'instance_type = "t3.medium"', reasoning: 'Upgrade instance type for production workload' },
+        ],
+      },
+    },
+    lock: {
+      agentId: 'lock', agentName: 'Hardener', type: 'hardener',
+      data: {
+        controls: [
+          { id: 'IAM-01', name: 'Least privilege IAM roles', category: 'Identity', applied: true, description: 'IAM roles follow least-privilege principle' },
+          { id: 'ENC-01', name: 'Encryption at rest', category: 'Encryption', applied: true, description: 'KMS encryption enabled for all data stores' },
+          { id: 'LOG-01', name: 'Audit logging', category: 'Logging', applied: false, description: 'CloudTrail logging for API calls' },
+        ],
+        passed: 2, total: 3,
+      },
+    },
+    fileText: {
+      agentId: 'fileText', agentName: 'Docs', type: 'docs',
+      data: {
+        sections: [
+          { title: 'Overview', content: 'This architecture deploys a scalable web application on AWS using ECS Fargate with RDS and ElastiCache.' },
+          { title: 'Networking', content: 'VPC configured with public/private subnets across 3 availability zones.' },
+        ],
+        readme: '# Cerebras Nexus Infrastructure\n\nAutomated infrastructure deployment.',
+        adr: null,
+      },
+    },
+    clipboardCheck: {
+      agentId: 'clipboardCheck', agentName: 'Validator', type: 'validator',
+      data: {
+        checks: [
+          { name: 'Terraform syntax', passed: true, weight: 30, message: 'Configuration is valid' },
+          { name: 'Security groups', passed: true, weight: 25, message: 'No overly permissive rules' },
+          { name: 'IAM policies', passed: true, weight: 25, message: 'Least privilege enforced' },
+        ],
+        score: 100, approved: true,
+      },
+    },
+  }
+
   const advanceAgent = () => {
     if (step >= AGENT_ORDER.length) {
       if (progressTimer) clearInterval(progressTimer)
@@ -224,7 +301,7 @@ export function startMockPipeline(
         },
         security: { passed: 14, failed: 0, warnings: ['Review ALB access logs retention', 'Enable AWS Config rules'] },
         validation: { valid: true, errors: [] },
-        agentReports: {},
+        agentReports: MOCK_AGENT_REPORTS,
       })
       return
     }

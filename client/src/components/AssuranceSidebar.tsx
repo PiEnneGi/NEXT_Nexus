@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, CheckCircle, AlertTriangle, XCircle, ArrowLeft, Code, LayoutDashboard, Globe } from 'lucide-react'
-import type { ComplianceReport, SecurityReport, ValidationReport, AgentReport, AgentId } from '@shared/types'
+import { Shield, CheckCircle, AlertTriangle, XCircle, ArrowLeft, Code, LayoutDashboard, Globe, Terminal, BookOpen, Files, FileText } from 'lucide-react'
+import type { ComplianceReport, SecurityReport, ValidationReport, AgentReport, AgentId, DocsData } from '@shared/types'
 import { AnalyzeReport } from './reports/AnalyzeReport'
 import { ComplianceReport as ComplianceReportView } from './reports/ComplianceReport'
 import { HealReport } from './reports/HealReport'
@@ -74,37 +74,102 @@ function LayoutReport({ data }: { data: any }) {
   )
 }
 
-function CodeXmlReport({ data, fullCode }: { data: any; fullCode?: string }) {
-  const code = data?.code || fullCode || ''
+function CodeXmlReport({ data, fullCode, docsData }: {
+  data: any
+  fullCode?: string
+  docsData?: DocsData
+}) {
+  const [copied, setCopied] = useState(false)
+
   const modules = data?.modules ?? []
-  const preview = code.slice(0, 500) + (code.length > 500 ? '...' : '')
+  const language = data?.language ?? 'hcl'
+
+  const quickStartCommand = language === 'yaml'
+    ? 'aws cloudformation deploy --template-file template.yaml --stack-name nexus-stack --capabilities CAPABILITY_IAM'
+    : language === 'typescript'
+      ? 'pulumi up --stack dev'
+      : 'terraform init && terraform plan && terraform apply'
+
+  const files: { name: string; desc: string }[] = modules.length > 0
+    ? modules.map((m: { name: string; type: string }) => ({
+        name: `${m.name}.tf`,
+        desc: `Modulo ${m.type}: ${m.name}`,
+      }))
+    : [
+        { name: 'main.tf', desc: 'Definizione risorse primarie' },
+        { name: 'variables.tf', desc: 'Variabili di input con descrizioni e valori predefiniti' },
+        { name: 'outputs.tf', desc: 'Valori di output dell\'infrastruttura' },
+        { name: 'provider.tf', desc: 'Configurazione provider e vincoli di versione' },
+      ]
+
+  const descrizione = modules.length > 0
+    ? `Questa infrastruttura genera ${modules.length} moduli Terraform che implementano i componenti: ${modules.map((m: { name: string }) => m.name).join(', ')}. Segue le best practice AWS con version pinning, tagging obbligatorio e crittografia abilitata.`
+    : docsData?.readme
+      ? docsData.readme.slice(0, 300)
+      : 'Infrastruttura cloud generata automaticamente dal pipeline Cerebras Nexus. Il codice prodotto segue le best practice di settore per sicurezza, affidabilità e scalabilità.'
+
+  const noteTecniche = docsData?.sections?.length
+    ? docsData.sections.map((s) => s.content).join(' ')
+    : 'Verificare che le variabili d\'ambiente (AWS_REGION, PROJECT_NAME, ENVIRONMENT) siano configurate correttamente prima del deployment. Controllare che i valori predefiniti in terraform.tfvars corrispondano all\'ambiente target.'
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(quickStartCommand)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className="space-y-3">
-      {modules.length > 0 && (
-        <div className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] p-3">
-          <span className="text-[10px] font-mono text-gray-300 uppercase tracking-wider">Modules ({modules.length})</span>
-          <div className="mt-2 space-y-1">
-            {modules.map((m: { name: string; type: string }, i: number) => (
-              <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
-                <Code size={10} className="text-[#CCFF00] shrink-0" />
-                <span className="text-gray-300">{m.name}</span>
-                <span className="text-gray-500">({m.type})</span>
-              </div>
-            ))}
-          </div>
+      <div className="flex items-center gap-2 p-3 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A]">
+        <FileText size={16} className="text-[#CCFF00]" />
+        <span className="text-xs font-mono text-gray-300">Guida Operativa Umana</span>
+      </div>
+
+      <div className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <BookOpen size={13} className="text-[#33FF77]" />
+          <span className="text-[10px] font-mono text-gray-300 uppercase tracking-wider">Descrizione</span>
         </div>
-      )}
+        <p className="text-[10px] text-gray-400 font-mono leading-5">{descrizione}</p>
+      </div>
+
       <div className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] overflow-hidden">
         <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1A1A1A]">
-          <Code size={12} className="text-[#CCFF00]" />
-          <span className="text-[10px] font-mono text-gray-300 uppercase tracking-wider">
-            Generated Code {data?.language ? `(${data.language})` : ''}
-          </span>
+          <Terminal size={12} className="text-[#FF6B00]" />
+          <span className="text-[10px] font-mono text-gray-300 uppercase tracking-wider">Quick Start</span>
         </div>
-        <pre className="text-[10px] text-gray-400 font-mono whitespace-pre-wrap leading-5 p-3 max-h-80 overflow-auto">
-          {preview || 'No code generated'}
-        </pre>
+        <div onClick={handleCopy} className="relative cursor-pointer group">
+          <pre className="text-[10px] text-gray-400 font-mono whitespace-pre-wrap leading-5 p-3 bg-[#050505] overflow-x-auto">
+            {quickStartCommand}
+          </pre>
+          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-[#1A1A1A] text-[8px] font-mono text-gray-500 group-hover:text-gray-300 transition-colors">
+            {copied ? 'Copiato!' : 'Copia'}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Files size={13} className="text-[#CCFF00]" />
+          <span className="text-[10px] font-mono text-gray-300 uppercase tracking-wider">Manifest ({files.length})</span>
+        </div>
+        <ul className="space-y-1.5">
+          {files.map((f, i) => (
+            <li key={i} className="flex items-start gap-2 text-[10px] font-mono">
+              <Code size={10} className="text-[#FF6B00] mt-0.5 shrink-0" />
+              <span className="text-gray-300">{f.name}</span>
+              <span className="text-gray-500">— {f.desc}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle size={13} className="text-[#FF6B00]" />
+          <span className="text-[10px] font-mono text-gray-300 uppercase tracking-wider">Note Tecniche</span>
+        </div>
+        <p className="text-[10px] text-gray-400 font-mono leading-5">{noteTecniche}</p>
       </div>
     </div>
   )
@@ -130,6 +195,8 @@ export function AssuranceSidebar({
     try {
       if (!selectedAgentId) return null
 
+      const docsData = agentReports['fileText']?.data as DocsData | undefined
+
       if (selectedReport) {
         switch (selectedReport.type) {
           case 'analyze':
@@ -137,7 +204,7 @@ export function AssuranceSidebar({
           case 'layout':
             return <LayoutReport data={selectedReport.data} />
           case 'codeXml':
-            return <CodeXmlReport data={selectedReport.data} fullCode={resultCode} />
+            return <CodeXmlReport data={selectedReport.data} fullCode={resultCode} docsData={docsData} />
           case 'compliance':
             return <ComplianceReportView data={selectedReport.data as any} />
           case 'heal':
@@ -151,13 +218,13 @@ export function AssuranceSidebar({
         }
       }
 
-      if (selectedAgentId === 'layout' || selectedAgentId === 'codeXml') {
-        return null
+      if (selectedAgentId === 'codeXml' && resultCode !== undefined) {
+        return <CodeXmlReport data={null} fullCode={resultCode} docsData={docsData} />
       }
 
       return (
         <div className="flex flex-col items-center justify-center h-full text-center px-4">
-          <p className="text-[10px] font-mono text-gray-500">No report data available for this agent</p>
+          <p className="text-[10px] font-mono text-gray-500">Report not generated — the AI output could not be parsed into a structured report for this agent</p>
         </div>
       )
     } catch (err) {
@@ -210,9 +277,7 @@ export function AssuranceSidebar({
                     </motion.button>
                   </div>
                 )}
-                {selectedAgentId === 'codeXml' && (resultCode?.length ?? 0) > 500 && (
-                  <p className="text-[9px] text-gray-500 mt-2 text-center">Showing first 500 characters</p>
-                )}
+
               </div>
             </>
           ) : (

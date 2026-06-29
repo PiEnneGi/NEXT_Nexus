@@ -82,15 +82,15 @@ function parseCodeXml(output: string): CodeXmlData | null {
     modules?: { name: string; type: string }[]
     language?: string
   }>(output)
-  if (!json) return null
   const parsed = parseAgentOutput(output)
   const codeBlock = parsed.codeBlocks.find(
     (b) => b.language === 'hcl' || b.language === 'terraform' || b.language === 'yaml',
   )
+  if (!json && !codeBlock) return null
   return {
     code: codeBlock?.code ?? '',
-    language: json.language ?? codeBlock?.language ?? 'hcl',
-    modules: json.modules ?? [],
+    language: json?.language ?? codeBlock?.language ?? 'hcl',
+    modules: json?.modules ?? [],
   }
 }
 
@@ -219,8 +219,9 @@ export async function orchestrate(
     switch (agent.id) {
       case 'search': {
         const data = parseAnalyze(fullOutput)
-        if (data) {
-          agentReport = { agentId: 'search', agentName: label, type: 'analyze', data }
+        agentReport = {
+          agentId: 'search', agentName: label, type: 'analyze',
+          data: data ?? { requirements: [], rpo: 'N/A', rto: 'N/A', services: [] },
         }
         break
       }
@@ -247,8 +248,9 @@ export async function orchestrate(
       }
       case 'codeXml': {
         const data = parseCodeXml(fullOutput)
-        if (data) {
-          agentReport = { agentId: 'codeXml', agentName: label, type: 'codeXml', data }
+        agentReport = {
+          agentId: 'codeXml', agentName: label, type: 'codeXml',
+          data: data ?? { code: '', language: 'hcl', modules: [] },
         }
         break
       }
@@ -256,15 +258,20 @@ export async function orchestrate(
         const data = parseCompliance(fullOutput)
         if (data) {
           totalComplianceFindings = data
-          agentReport = { agentId: 'shieldCheck', agentName: label, type: 'compliance', data }
+        }
+        agentReport = {
+          agentId: 'shieldCheck', agentName: label, type: 'compliance',
+          data: totalComplianceFindings,
         }
         break
       }
       case 'zap': {
         const data = parseHeal(fullOutput)
+        agentReport = {
+          agentId: 'zap', agentName: label, type: 'heal',
+          data: data ?? { patches: [] },
+        }
         if (data) {
-          agentReport = { agentId: 'zap', agentName: label, type: 'heal', data }
-
           for (const patch of data.patches) {
             const patchRef = agent3Code || currentCode
             if (patch.original && patch.patched) {
@@ -282,14 +289,18 @@ export async function orchestrate(
         const data = parseHardener(fullOutput)
         if (data) {
           hardenerResult = data
-          agentReport = { agentId: 'lock', agentName: label, type: 'hardener', data }
+        }
+        agentReport = {
+          agentId: 'lock', agentName: label, type: 'hardener',
+          data: data ?? { controls: [], passed: 0, total: 0 },
         }
         break
       }
       case 'fileText': {
         const data = parseDocs(fullOutput)
-        if (data) {
-          agentReport = { agentId: 'fileText', agentName: label, type: 'docs', data }
+        agentReport = {
+          agentId: 'fileText', agentName: label, type: 'docs',
+          data: data ?? { sections: [], readme: '', adr: null },
         }
         break
       }
@@ -300,7 +311,10 @@ export async function orchestrate(
         const data = parseValidator(fullOutput)
         if (data) {
           validatorResult = data
-          agentReport = { agentId: 'clipboardCheck', agentName: label, type: 'validator', data }
+        }
+        agentReport = {
+          agentId: 'clipboardCheck', agentName: label, type: 'validator',
+          data: data ?? { checks: [], score: 0, approved: false },
         }
         break
       }

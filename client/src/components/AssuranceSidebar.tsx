@@ -127,48 +127,59 @@ export function AssuranceSidebar({
   const selectedReport = selectedAgentId ? agentReports[selectedAgentId] : undefined
 
   const renderAgentReport = () => {
-    if (!selectedAgentId) return null
+    try {
+      if (!selectedAgentId) return null
 
-    if (selectedReport) {
-      switch (selectedReport.type) {
-        case 'analyze':
-          return <AnalyzeReport data={selectedReport.data as any} />
-        case 'layout':
-          return <LayoutReport data={selectedReport.data} />
-        case 'codeXml':
-          return <CodeXmlReport data={selectedReport.data} fullCode={resultCode} />
-        case 'compliance':
-          return <ComplianceReportView data={selectedReport.data as any} />
-        case 'heal':
-          return <HealReport data={selectedReport.data as any} />
-        case 'hardener':
-          return <HardenerReport data={selectedReport.data as any} />
-        case 'docs':
-          return <DocsReport data={selectedReport.data as any} />
-        case 'validator':
-          return <ValidatorReport data={selectedReport.data as any} />
+      if (selectedReport) {
+        switch (selectedReport.type) {
+          case 'analyze':
+            return <AnalyzeReport data={selectedReport.data as any} />
+          case 'layout':
+            return <LayoutReport data={selectedReport.data} />
+          case 'codeXml':
+            return <CodeXmlReport data={selectedReport.data} fullCode={resultCode} />
+          case 'compliance':
+            return <ComplianceReportView data={selectedReport.data as any} />
+          case 'heal':
+            return <HealReport data={selectedReport.data as any} />
+          case 'hardener':
+            return <HardenerReport data={selectedReport.data as any} />
+          case 'docs':
+            return <DocsReport data={selectedReport.data as any} />
+          case 'validator':
+            return <ValidatorReport data={selectedReport.data as any} />
+        }
       }
-    }
 
-    if (selectedAgentId === 'layout' || selectedAgentId === 'codeXml') {
-      return null
-    }
+      if (selectedAgentId === 'layout' || selectedAgentId === 'codeXml') {
+        return null
+      }
 
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <p className="text-[10px] font-mono text-gray-500">No report data available for this agent</p>
-      </div>
-    )
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center px-4">
+          <p className="text-[10px] font-mono text-gray-500">No report data available for this agent</p>
+        </div>
+      )
+    } catch (err) {
+      console.error('[AssuranceSidebar] Error rendering agent report:', err)
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center px-4">
+          <p className="text-[10px] font-mono text-[#FF3333]">Error loading report data</p>
+        </div>
+      )
+    }
   }
 
   return (
     <AnimatePresence>
       {open && (
         <motion.aside
+          key="assurance-sidebar"
           initial={{ width: 0, opacity: 0 }}
           animate={{ width: 320, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeInOut' }}
+          layout="position"
           className="h-full bg-[#0D0D0D] border-l border-[#1A1A1A] overflow-hidden flex flex-col shrink-0"
         >
           {selectedAgentId ? (

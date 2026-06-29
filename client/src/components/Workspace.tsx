@@ -10,7 +10,7 @@ interface Props {
 
 export function Workspace({ result, streamedCode, activeDiffView }: Props) {
   return (
-    <main className="flex-1 flex gap-3 p-3 h-full min-h-0">
+    <main className="flex-1 flex gap-3 p-3 h-full min-h-0 min-w-0">
       <ArchitecturePanel
         diagramSvg={result?.diagramSvg ?? null}
         diagramMermaid={result?.diagramMermaid ?? null}

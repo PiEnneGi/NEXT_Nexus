@@ -82,7 +82,7 @@ export function ArchitecturePanel({ diagramSvg, diagramMermaid }: Props) {
   return (
     <div
       ref={panelRef}
-      className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-[#1A1A1A] overflow-hidden"
+      className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-[#1A1A1A] overflow-hidden min-w-0"
     >
       <div className="flex items-center justify-between px-4 py-2 border-b border-[#1A1A1A]">
         <span className="text-xs text-gray-400 font-mono">Architecture Diagram</span>
@@ -105,7 +105,7 @@ export function ArchitecturePanel({ diagramSvg, diagramMermaid }: Props) {
           </motion.button>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+      <div className="flex-1 flex items-center justify-center p-4 overflow-auto min-w-0">
         {isRendering ? (
           <div className="text-center text-gray-600">
             <div className="animate-pulse text-2xl mb-2 opacity-30">◌</div>

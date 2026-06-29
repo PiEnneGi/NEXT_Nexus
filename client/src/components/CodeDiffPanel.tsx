@@ -29,7 +29,7 @@ export function CodeDiffPanel({ code, diffLines, streamedCode, defaultTab }: Pro
   const displayCode = streamedCode || code || '// No code generated yet'
 
   return (
-    <div className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-[#1A1A1A] overflow-hidden">
+    <div className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-[#1A1A1A] overflow-hidden min-w-0">
       <div className="flex border-b border-[#1A1A1A]">
         <button
           onClick={() => setTab('code')}

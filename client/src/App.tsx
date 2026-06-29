@@ -47,7 +47,7 @@ export default function App() {
         onExportPDF={handleExportPDF}
       />
 
-      <div className="flex flex-1 pt-12 ml-16 min-h-0">
+      <div className="flex flex-1 pt-12 ml-16 min-h-0 min-w-0">
         <Workspace
           result={result}
           streamedCode={streamedCode}

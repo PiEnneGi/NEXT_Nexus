@@ -82,7 +82,7 @@ export function AnalyzeReport({ data }: Props) {
               key={i}
               className="text-[10px] font-mono px-2 py-1 rounded bg-[#1A1A1A] text-gray-400"
             >
-              {s}
+              {typeof s === 'string' ? s : String(s)}
             </span>
           ))}
           {services.length === 0 && (

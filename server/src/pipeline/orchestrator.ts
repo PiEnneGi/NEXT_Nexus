@@ -40,7 +40,7 @@ function parseAnalyze(output: string): AnalyzeData | null {
     requirements?: { name: string; value: string; priority: string }[]
     rpo?: string
     rto?: string
-    services?: string[]
+    services?: Array<Record<string, unknown> | string>
   }>(output)
   if (!json) return null
   return {
@@ -51,7 +51,9 @@ function parseAnalyze(output: string): AnalyzeData | null {
     })),
     rpo: json.rpo ?? 'N/A',
     rto: json.rto ?? 'N/A',
-    services: json.services ?? [],
+    services: (json.services ?? []).map((s) =>
+      typeof s === 'string' ? s : ((s as Record<string, unknown>).service as string) ?? JSON.stringify(s),
+    ),
   }
 }
 

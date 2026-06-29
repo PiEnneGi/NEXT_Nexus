@@ -32,12 +32,20 @@ export function ComplianceReport({ data }: Props) {
       animate={{ opacity: 1 }}
       className="space-y-3"
     >
-      <div className="flex items-center gap-2 p-3 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A]">
+      <div className="flex items-center gap-3 p-3 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A]">
         <Shield size={16} className={total > 0 ? (passed === total ? 'text-[#33FF77]' : 'text-[#FF3333]') : 'text-gray-500'} />
         {total > 0 ? (
-          <span className="text-xs font-mono text-gray-300">
-            {passed}/{total} passed
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-gray-300">
+              {passed}<span className="text-gray-600">/{total}</span> passed
+            </span>
+            {passed < total && (
+              <>
+                <span className="text-[10px] text-gray-700">|</span>
+                <span className="text-[10px] font-mono text-[#FF3333]">{total - passed} failed</span>
+              </>
+            )}
+          </div>
         ) : (
           <span className="text-xs font-mono text-gray-500">No findings available</span>
         )}

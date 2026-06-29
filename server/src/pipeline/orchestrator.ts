@@ -468,6 +468,23 @@ export async function orchestrate(
       throw err
     }
 
+    // Enterprise self-healing: retry if output lacks parseable JSON
+    if (!extractFirstJson(fullOutput)) {
+      emit('agent-retry', JSON.stringify({ agentId: agent.id, agentName: agent.name }))
+      emit('token', JSON.stringify({
+        agentId: agent.id,
+        token: `\n\n[RETRY] Output unparseable, regenerating...\n`,
+      }))
+      fullOutput = await streamCerebras({
+        messages: [...messages, {
+          role: 'user',
+          content: `[SYSTEM RETRY] Your previous "${agent.name}" response had invalid JSON. Regenerate ENTIRE response following the system prompt EXACTLY. Valid JSON inside <json> tags, no syntax errors, no text outside the required format.`,
+        }],
+        onToken: (token) => emit('token', JSON.stringify({ agentId: agent.id, token })),
+        signal,
+      })
+    }
+
     context += `\n--- ${agent.name} output ---\n${fullOutput}\n`
 
     const parsed = parseAgentOutput(fullOutput)

@@ -117,6 +117,7 @@ export function HealReport({ data }: Props) {
   const setActiveDiffView = usePipelineStore((s) => s.setActiveDiffView)
   const patches = data?.patches ?? []
   const compliancePatches = patches.filter((p) => p.fixesViolation)
+  const autonomousPatches = patches.filter((p) => !p.fixesViolation && !p.advisory)
   const [hoveredPatch, setHoveredPatch] = useState<{ patch: HealPatch; rect: DOMRect; index: number } | null>(null)
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -161,15 +162,22 @@ export function HealReport({ data }: Props) {
       animate={{ opacity: 1 }}
       className="space-y-3"
     >
-      <div className="flex items-center gap-2 p-3 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A1]">
+      <div className="flex items-center gap-3 p-3 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A]">
         <Zap size={16} className="text-[#FF6B00]" />
         <span className="text-xs font-mono text-gray-300">
           {patches.length} patch{patches.length !== 1 ? 'es' : ''} applied
         </span>
         {compliancePatches.length > 0 && (
-          <span className="text-[9px] font-mono text-[#33FF77] ml-auto">
-            {compliancePatches.length} compliance fix{compliancePatches.length !== 1 ? 'es' : ''}
-          </span>
+          <>
+            <span className="text-[10px] text-gray-700">|</span>
+            <span className="text-[10px] font-mono text-[#33FF77]">{compliancePatches.length} from Shield</span>
+          </>
+        )}
+        {autonomousPatches.length > 0 && (
+          <>
+            <span className="text-[10px] text-gray-700">+</span>
+            <span className="text-[10px] font-mono text-[#FF6B00]">{autonomousPatches.length} autonomous</span>
+          </>
         )}
       </div>
 
@@ -199,11 +207,14 @@ export function HealReport({ data }: Props) {
                 {patch.fixesViolation && (
                   <span className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#33FF77]/10 text-[#33FF77] border border-[#33FF77]/30">
                     <Shield size={9} />
-                    {patch.fixesViolation}
+                    Shield
                   </span>
                 )}
-                {patch.patchType === 'compliance' && !patch.advisory && (
-                  <span className="text-[9px] font-mono text-[#33FF77]/70">Compliance</span>
+                {!patch.fixesViolation && !patch.advisory && (
+                  <span className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/30">
+                    <Zap size={9} />
+                    Autonomous
+                  </span>
                 )}
                 <motion.button
                   onClick={() => setActiveDiffView(true)}

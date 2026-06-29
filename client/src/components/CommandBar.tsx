@@ -1,116 +1,187 @@
 import { useState, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Image, Mic, MicOff, Send } from 'lucide-react'
-import { WaveAnimation } from './WaveAnimation'
+import { Paperclip, Send, X } from 'lucide-react'
 
 interface Props {
-  onSend: (text: string) => void
+  onSend: (text: string, fileSessionId?: string) => void
   disabled?: boolean
 }
 
-const MOCK_TRANSCRIPTIONS = [
-  "Deploy a scalable microservices architecture on AWS with ECS Fargate, RDS PostgreSQL, and ElastiCache Redis. Include a VPC with public and private subnets across three availability zones.",
-  "Build a serverless data pipeline using AWS Lambda, Kinesis Data Streams, S3, and DynamoDB. Implement event-driven processing with SQS dead-letter queues and CloudWatch monitoring.",
-  "Provision a Kubernetes cluster on EKS with node groups, IAM roles for service accounts, and a CI/CD pipeline using CodePipeline. Include ALB ingress controller and cert-manager for TLS.",
-  "Design a multi-region disaster recovery setup on AWS with Route53 failover, RDS cross-region replicas, S3 cross-region replication, and CloudFront with origin failover.",
-  "Create a SOC 2 compliant infrastructure on AWS with CloudTrail, Config rules, GuardDuty, Security Hub, VPC flow logs, and encrypted EBS volumes with KMS CMK.",
-  "Deploy a real-time chat application infrastructure using WebSocket API Gateway, DynamoDB streams, Lambda, and ElastiCache for session management across two regions.",
+interface AttachedFile {
+  id: string
+  file: File
+  name: string
+  type: string
+  size: number
+  preview?: string
+  status: 'ready' | 'uploading' | 'done' | 'error'
+  error?: string
+}
+
+const ALLOWED_EXTENSIONS = [
+  '.md', '.txt', '.json', '.yaml', '.yml', '.csv', '.toml', '.ini', '.xml', '.log',
+  '.pdf',
+  '.docx', '.doc',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg',
 ]
 
-const MOCK_TRANSCRIPTION_COMMANDS = [
-  "Configure an Auto Scaling group with launch templates, target tracking policies, and scheduled scaling for a production web application on EC2.",
-  "Set up a CI/CD pipeline with GitHub Actions, ECR, and ECS blue/green deployments using CodeDeploy with automatic rollback on health check failure.",
-]
+const MAX_FILE_SIZE = 20 * 1024 * 1024
 
-function getRandomTranscription(): string {
-  const all = [...MOCK_TRANSCRIPTIONS, ...MOCK_TRANSCRIPTION_COMMANDS]
-  return all[Math.floor(Math.random() * all.length)]
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function getFileEmoji(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase()
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext ?? '')) return '🖼️'
+  if (ext === 'pdf') return '📄'
+  if (['doc', 'docx'].includes(ext ?? '')) return '📝'
+  if (['md', 'txt'].includes(ext ?? '')) return '📝'
+  if (['json', 'yaml', 'yml', 'xml', 'toml', 'ini'].includes(ext ?? '')) return '⚙️'
+  if (['csv', 'log'].includes(ext ?? '')) return '📊'
+  return '📎'
+}
+
+function isAllowedFile(file: File): { allowed: boolean; reason?: string } {
+  const ext = '.' + (file.name.split('.').pop()?.toLowerCase() ?? '')
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return { allowed: false, reason: `Unsupported file type: ${ext}` }
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return { allowed: false, reason: `File too large: ${formatSize(file.size)} (max ${formatSize(MAX_FILE_SIZE)})` }
+  }
+  return { allowed: true }
 }
 
 export function CommandBar({ onSend, disabled }: Props) {
   const [input, setInput] = useState('')
-  const [listening, setListening] = useState(false)
-  const [micError, setMicError] = useState<string | null>(null)
+  const [files, setFiles] = useState<AttachedFile[]>([])
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
 
-  const stopListening = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
+  const addFiles = useCallback((fileList: FileList | File[]) => {
+    const newFiles: AttachedFile[] = []
+    for (const file of Array.from(fileList)) {
+      const check = isAllowedFile(file)
+      if (!check.allowed) continue
+      let preview: string | undefined
+      if (file.type.startsWith('image/')) {
+        preview = URL.createObjectURL(file)
+      }
+      newFiles.push({
+        id: crypto.randomUUID(),
+        file,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        preview,
+        status: 'ready',
+      })
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-    }
-    setListening(false)
+    setFiles((prev) => [...prev, ...newFiles])
   }, [])
 
-  const startListening = useCallback(async () => {
-    setMicError(null)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
+  const removeFile = useCallback((id: string) => {
+    setFiles((prev) => {
+      const file = prev.find((f) => f.id === id)
+      if (file?.preview) URL.revokeObjectURL(file.preview)
+      return prev.filter((f) => f.id !== id)
+    })
+  }, [])
 
-      const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : 'audio/webm',
-      })
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }, [])
 
-      mediaRecorderRef.current = recorder
-      const chunks: Blob[] = []
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data)
-      }
-
-      recorder.onstop = () => {
-        const simulatedText = getRandomTranscription()
-        setInput((prev) => (prev ? prev + ' ' + simulatedText : simulatedText))
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((t) => t.stop())
-          streamRef.current = null
-        }
-      }
-
-      recorder.onerror = () => {
-        setMicError('Recording error')
-        stopListening()
-      }
-
-      recorder.start()
-      setListening(true)
-
-      setTimeout(() => {
-        if (mediaRecorderRef.current?.state === 'recording') {
-          mediaRecorderRef.current.stop()
-        }
-      }, 3000)
-    } catch (err) {
-      const msg =
-        err instanceof DOMException && err.name === 'NotAllowedError'
-          ? 'Microphone permission denied'
-          : 'Microphone unavailable'
-      setMicError(msg)
-      setListening(false)
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    if (e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files)
     }
-  }, [stopListening])
+  }, [addFiles])
 
-  const handleToggleMic = () => {
-    if (listening) {
-      stopListening()
-    } else {
-      startListening()
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    if (e.clipboardData.files.length > 0) {
+      e.preventDefault()
+      addFiles(e.clipboardData.files)
     }
-  }
+  }, [addFiles])
 
-  const handleSubmit = () => {
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(e.target.files)
+      e.target.value = ''
+    }
+  }, [addFiles])
+
+  const handleSubmit = useCallback(async () => {
     const trimmed = input.trim()
-    if (!trimmed || disabled) return
-    onSend(trimmed)
-    setInput('')
-  }
+    if ((!trimmed && files.length === 0) || disabled || uploading) return
+
+    if (files.length === 0) {
+      onSend(trimmed)
+      setInput('')
+      return
+    }
+
+    setUploading(true)
+
+    setFiles((prev) => prev.map((f) => f.status === 'ready' ? { ...f, status: 'uploading' as const } : f))
+
+    try {
+      const textFileContents: string[] = []
+      let fileSessionId: string | undefined
+
+      for (const af of files) {
+        if (af.type.startsWith('text/') || af.name.endsWith('.md') || af.name.endsWith('.svg')) {
+          const content = await af.file.text()
+          textFileContents.push(`--- ${af.name} ---\n${content}\n`)
+          setFiles((prev) => prev.map((f) => f.id === af.id ? { ...f, status: 'done' as const } : f))
+        } else {
+          const formData = new FormData()
+          formData.append('file', af.file)
+          const res = await fetch('/upload', {
+            method: 'POST',
+            body: formData,
+          })
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: 'Upload failed' }))
+            throw new Error(err.error ?? `Upload failed: ${res.statusText}`)
+          }
+          const data = await res.json()
+          fileSessionId = data.sessionId
+          setFiles((prev) => prev.map((f) => f.id === af.id ? { ...f, status: 'done' as const } : f))
+        }
+      }
+
+      let message = trimmed
+      if (textFileContents.length > 0) {
+        message += '\n\n--- Attached Files ---\n' + textFileContents.join('\n')
+      }
+
+      onSend(message, fileSessionId)
+      setInput('')
+      setFiles([])
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      setFiles((prev) => prev.map((f) => f.status === 'uploading' ? { ...f, status: 'error' as const, error: msg } : f))
+    } finally {
+      setUploading(false)
+    }
+  }, [input, files, disabled, uploading, onSend])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -119,56 +190,110 @@ export function CommandBar({ onSend, disabled }: Props) {
     }
   }
 
+  const hasFiles = files.length > 0
+
   return (
     <motion.div
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[600px] max-w-[90vw] z-50"
     >
-      <div className="flex items-center gap-2 bg-[#0D0D0D] border border-[#1A1A1A] rounded-xl px-3 py-2 shadow-2xl">
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={() => fileRef.current?.click()}
-          className="p-1.5 rounded-lg hover:bg-[#1A1A1A] text-gray-400 hover:text-white transition-colors"
-        >
-          <Image size={16} />
-        </motion.button>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" />
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`flex flex-col bg-[#0D0D0D] border rounded-xl shadow-2xl transition-colors ${
+          isDragOver
+            ? 'border-[#FF6B00] border-dashed'
+            : 'border-[#1A1A1A]'
+        }`}
+      >
+        {hasFiles && (
+          <div className="flex flex-wrap gap-1.5 px-3 pt-3 pb-1">
+            {files.map((af) => (
+              <div
+                key={af.id}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs border text-white ${
+                  af.status === 'error'
+                    ? 'border-red-500/50 bg-red-500/10'
+                    : 'border-[#2A2A2A] bg-[#1A1A1A]'
+                }`}
+              >
+                {af.preview ? (
+                  <img src={af.preview} alt="" className="w-5 h-5 rounded object-cover" />
+                ) : (
+                  <span className="text-sm leading-none">{getFileEmoji(af.name)}</span>
+                )}
+                <span className="max-w-[120px] truncate">{af.name}</span>
+                <span className="text-gray-500 shrink-0">{formatSize(af.size)}</span>
+                {af.status === 'uploading' && (
+                  <span className="w-3 h-3 border border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
+                )}
+                {af.status === 'error' && (
+                  <span className="text-red-400 text-[10px]" title={af.error}>err</span>
+                )}
+                <button
+                  onClick={() => removeFile(af.id)}
+                  className="p-0.5 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors shrink-0"
+                  disabled={af.status === 'uploading'}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Describe the infrastructure architecture..."
-          className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 outline-none font-mono"
-          disabled={disabled}
-        />
+        <div className="flex items-center gap-2 px-3 py-2">
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => fileRef.current?.click()}
+            className={`p-1.5 rounded-lg hover:bg-[#1A1A1A] text-gray-400 hover:text-white transition-colors ${
+              isDragOver ? 'text-[#FF6B00]' : ''
+            }`}
+            title={isDragOver ? 'Drop files here' : 'Attach files'}
+            disabled={disabled}
+          >
+            <Paperclip size={16} />
+          </motion.button>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            accept={ALLOWED_EXTENSIONS.join(',')}
+            className="hidden"
+            onChange={handleFileSelect}
+          />
 
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={handleToggleMic}
-          className={`p-1.5 rounded-lg transition-colors ${
-            listening
-              ? 'bg-[#FF3333]/20 text-[#FF3333]'
-              : micError
-                ? 'bg-[#FF6B00]/10 text-[#FF6B00]'
-                : 'hover:bg-[#1A1A1A] text-gray-400 hover:text-white'
-          }`}
-          title={micError ?? (listening ? 'Stop recording' : 'Start recording')}
-        >
-          {listening ? <MicOff size={16} /> : <Mic size={16} />}
-        </motion.button>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={
+              isDragOver
+                ? 'Drop files here...'
+                : hasFiles
+                  ? 'Add a message or send files...'
+                  : 'Describe the infrastructure architecture...'
+            }
+            className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 outline-none font-mono"
+            disabled={disabled}
+          />
 
-        <WaveAnimation active={listening} />
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={handleSubmit}
-          disabled={disabled || !input.trim()}
-          className="p-1.5 rounded-lg bg-[#FF6B00] text-white hover:bg-[#e55f00] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Send size={16} />
-        </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={handleSubmit}
+            disabled={disabled || (!input.trim() && files.length === 0) || uploading}
+            className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+              uploading
+                ? 'bg-[#FF6B00]/50 text-white'
+                : 'bg-[#FF6B00] text-white hover:bg-[#e55f00]'
+            }`}
+          >
+            <Send size={16} />
+          </motion.button>
+        </div>
       </div>
     </motion.div>
   )

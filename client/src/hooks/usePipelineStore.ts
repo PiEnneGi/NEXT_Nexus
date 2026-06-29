@@ -27,7 +27,7 @@ interface PipelineStore {
   selectAgent: (id: AgentId | null) => void
   setActiveDiffView: (active: boolean) => void
   reset: () => void
-  startPipeline: (input: string) => void
+  startPipeline: (input: string, fileSessionId?: string) => void
 }
 
 const initialAgentState: AgentState = { progress: 0, status: 'idle' }
@@ -120,14 +120,19 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     })
   },
 
-  startPipeline: (input: string) => {
+  startPipeline: (input: string, fileSessionId?: string) => {
     cleanupPipeline()
 
     const store = get()
     store.reset()
     store.setPipelineStatus('running')
 
-    const source = new EventSource(`/stream?input=${encodeURIComponent(input)}`)
+    let url = `/stream?input=${encodeURIComponent(input)}`
+    if (fileSessionId) {
+      url += `&fileSessionId=${encodeURIComponent(fileSessionId)}`
+    }
+
+    const source = new EventSource(url)
     activeSource = source
 
     source.addEventListener('agent-start', (e: MessageEvent) => {

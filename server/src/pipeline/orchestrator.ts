@@ -2,6 +2,8 @@ import type { AgentId, ArchitectureResult, DiffLine, AgentReport, AnalyzeData, L
 import { AGENT_PROMPTS_LIST } from '../agents/prompts.js'
 import { streamCerebras } from '../cerebras/stream.js'
 import type { ChatMessage } from '../cerebras/stream.js'
+import type { FileContext } from '../utils/fileProcessor.js'
+import { buildMultimodalContent } from '../utils/fileProcessor.js'
 import { parseAgentOutput, extractFirstJson, computeDiffLines, extractArrayItems, tryParseJson } from '../utils/parser.js'
 
 const MAX_CONTEXT_CHARS = 120_000
@@ -417,6 +419,7 @@ export async function orchestrate(
   userInput: string,
   emit: SSECallback,
   signal?: AbortSignal,
+  fileContexts: FileContext[] = [],
 ): Promise<void> {
   let context = ''
   let previousCode = ''
@@ -441,13 +444,16 @@ export async function orchestrate(
         complianceBlock = `\n\n=== COMPLIANCE VIOLATIONS TO FIX ===\nThe following compliance violations were found by the compliance auditor. Generate a patch for EACH violation that is not passed.\n\n<json>\n${JSON.stringify(violations, null, 2)}\n</json>\n`
       }
     }
+    const isFirstAgent = i === 0
     const messages: ChatMessage[] = [
       { role: 'system', content: agent.systemPrompt },
       {
         role: 'user',
-        content: safeContext
-          ? `Previous agent outputs:\n${safeContext}\n\nOriginal request:\n${userInput}${complianceBlock}`
-          : userInput,
+        content: isFirstAgent && fileContexts.length > 0
+          ? buildMultimodalContent(userInput, fileContexts)
+          : safeContext
+            ? `Previous agent outputs:\n${safeContext}\n\nOriginal request:\n${userInput}${complianceBlock}`
+            : userInput,
       },
     ]
 

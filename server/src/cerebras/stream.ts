@@ -1,9 +1,11 @@
+import type { ContentPart } from '../utils/fileProcessor.js'
+
 const MAX_RETRIES = 3
 const INITIAL_DELAY_MS = 1000
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  content: string | ContentPart[]
 }
 
 interface CerebrasStreamOptions {

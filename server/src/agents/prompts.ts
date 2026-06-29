@@ -110,8 +110,22 @@ Analyze latency requirements across three dimensions:
 You MUST respond ONLY with the following structure wrapped in <json> tags.
 No prose, no explanations, no greetings.
 
+The top-level fields have the following meaning:
+  - "rpo": global Recovery Point Objective for the entire project (e.g. "1 hour").
+  - "rto": global Recovery Time Objective for the entire project (e.g. "15 minutes").
+  - "requirements": a consolidated list of all project requirements with name, description, and priority (P0 = critical, P1 = high, P2 = medium).
+
 <json>
 {
+  "rpo": "string",
+  "rto": "string",
+  "requirements": [
+    {
+      "name": "string",
+      "value": "string",
+      "priority": "P0" | "P1" | "P2"
+    }
+  ],
   "workloads": [
     {
       "name": "string",
@@ -599,17 +613,17 @@ A.18 — Compliance (18.1-18.2):
 
 <json>
 {
-  "framework": "gdpr" | "hipaa" | "pci-dss" | "iso27001",
-  "overallCompliant": boolean,
-  "score": "string (e.g. 14/14 checks passed)",
+  "framework": "gdpr",
+  "overallCompliant": false,
+  "score": "string",
   "violations": [
     {
-      "article": "string (e.g. GDPR Art. 32(1)(a))",
-      "resource": "string (e.g. aws_s3_bucket.nexus-assets)",
-      "severity": "critical" | "high" | "medium" | "low",
+      "article": "string",
+      "resource": "string",
+      "severity": "critical",
       "finding": "string",
       "remediation": "string",
-      "technicalAction": "string (exact terraform config change or AWS CLI command)"
+      "technicalAction": "string"
     }
   ],
   "passedChecks": [
@@ -620,21 +634,32 @@ A.18 — Compliance (18.1-18.2):
     }
   ],
   "dataClassification": {
-    "piiDetected": boolean,
+    "piiDetected": false,
     "piiFields": ["string"],
-    "encryptionStatus": "encrypted" | "partially-encrypted" | "not-encrypted",
-    "retentionPoliciesConfigured": boolean
+    "encryptionStatus": "encrypted",
+    "retentionPoliciesConfigured": false
   },
   "recommendations": [
     {
-      "priority": "critical" | "high" | "medium" | "low",
+      "priority": "critical",
       "action": "string",
-      "effort": "minutes" | "hours" | "days",
+      "effort": "hours",
       "regulation": "string"
     }
   ]
 }
 </json>
+
+IMPORTANT: The JSON above uses example values. Use real values appropriate to your audit.
+For enum fields, use one of:
+  - framework: "gdpr", "hipaa", "pci-dss", "iso27001"
+  - overallCompliant: true or false
+  - severity: "critical", "high", "medium", "low"
+  - encryptionStatus: "encrypted", "partially-encrypted", "not-encrypted"
+  - piiDetected: true or false
+  - retentionPoliciesConfigured: true or false
+  - priority: "critical", "high", "medium", "low"
+  - effort: "minutes", "hours", "days"
 `,
   },
 

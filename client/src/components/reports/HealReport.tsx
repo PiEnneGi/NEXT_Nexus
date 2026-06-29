@@ -178,7 +178,11 @@ export function HealReport({ data }: Props) {
           <div
             key={i}
             className={`bg-[#0D0D0D] rounded-lg border overflow-hidden ${
-              patch.fixesViolation ? 'border-[#33FF77]/30' : 'border-[#1A1A1A]'
+              patch.advisory
+                ? 'border-[#FF6B00]/40 bg-[#FF6B00]/[0.03]'
+                : patch.fixesViolation
+                  ? 'border-[#33FF77]/30'
+                  : 'border-[#1A1A1A]'
             }`}
           >
             <div className="flex items-center justify-between px-3 py-2 border-b border-[#1A1A1A]">
@@ -187,13 +191,18 @@ export function HealReport({ data }: Props) {
                 <span className="text-[11px] font-mono text-gray-300">{patch.file}</span>
               </div>
               <div className="flex items-center gap-2">
+                {patch.advisory && (
+                  <span className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/40">
+                    Manual Fix Required
+                  </span>
+                )}
                 {patch.fixesViolation && (
                   <span className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#33FF77]/10 text-[#33FF77] border border-[#33FF77]/30">
                     <Shield size={9} />
                     {patch.fixesViolation}
                   </span>
                 )}
-                {patch.patchType === 'compliance' && (
+                {patch.patchType === 'compliance' && !patch.advisory && (
                   <span className="text-[9px] font-mono text-[#33FF77]/70">Compliance</span>
                 )}
                 <motion.button

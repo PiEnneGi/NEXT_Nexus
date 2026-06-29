@@ -2,7 +2,7 @@ import type { AgentId, ArchitectureResult, DiffLine, AgentReport, AnalyzeData, L
 import { AGENT_PROMPTS_LIST } from '../agents/prompts.js'
 import { streamCerebras } from '../cerebras/stream.js'
 import type { ChatMessage } from '../cerebras/stream.js'
-import { parseAgentOutput, extractFirstJson, computeDiffLines } from '../utils/parser.js'
+import { parseAgentOutput, extractFirstJson, computeDiffLines, extractArrayItems, tryParseJson } from '../utils/parser.js'
 
 const MAX_CONTEXT_CHARS = 120_000
 const KEEP_HEAD_CHARS = 20_000
@@ -41,6 +41,7 @@ function parseAnalyze(output: string): AnalyzeData | null {
     rpo?: string
     rto?: string
     services?: Array<Record<string, unknown> | string>
+    workloads?: Array<{ rpo?: string; rto?: string }>
   }>(output)
   if (!json) return null
   return {
@@ -49,8 +50,8 @@ function parseAnalyze(output: string): AnalyzeData | null {
       value: r.value ?? '',
       priority: (r.priority === 'P0' || r.priority === 'P1' || r.priority === 'P2' ? r.priority : 'P2') as 'P0' | 'P1' | 'P2',
     })),
-    rpo: json.rpo ?? 'N/A',
-    rto: json.rto ?? 'N/A',
+    rpo: json.rpo ?? json.workloads?.[0]?.rpo ?? 'N/A',
+    rto: json.rto ?? json.workloads?.[0]?.rto ?? 'N/A',
     services: (json.services ?? []).map((s) =>
       typeof s === 'string' ? s : ((s as Record<string, unknown>).service as string) ?? JSON.stringify(s),
     ),
@@ -206,18 +207,25 @@ function parseHeal(output: string): HealData | null {
     }
   }
 
-  // Strategy 5: Regex scan for inline patch objects (outside any tags)
+  // Strategy 5: Regex scan for inline patch objects — collect ALL matches
   const inlinePatchRE = /\{[^{}]*?"file"\s*:\s*"[^"]+"[^{}]*?"original"\s*:\s*"[^"]+"[^{}]*?"patched"\s*:\s*"[^"]+"[^{}]*?\}/g
+  const regexPatches: HealPatch[] = []
   while ((match = inlinePatchRE.exec(output)) !== null) {
-    try {
-      const obj = JSON.parse(match[0]) as HealPatch
-      if (obj.file && obj.original !== undefined && obj.patched !== undefined) {
-        return { patches: [obj] }
-      }
-    } catch {
-      // try next match
+    const obj = tryParseJson(match[0]) as Record<string, unknown> | null
+    if (obj && obj.file && obj.original !== undefined && obj.patched !== undefined) {
+      regexPatches.push({
+        file: String(obj.file ?? ''),
+        original: String(obj.original ?? ''),
+        patched: String(obj.patched ?? ''),
+        reasoning: obj.reasoning ? String(obj.reasoning) : undefined,
+        fixesViolation: obj.fixesViolation ? String(obj.fixesViolation) : undefined,
+        fixesViolationTitle: obj.fixesViolationTitle ? String(obj.fixesViolationTitle) : undefined,
+        patchType: (obj.patchType === 'compliance' || obj.patchType === 'security' ? obj.patchType : 'operational') as 'operational' | 'compliance' | 'security',
+        advisory: obj.advisory === true,
+      })
     }
   }
+  if (regexPatches.length > 0) return { patches: regexPatches }
 
   // Strategy 6: scan code blocks for [ACTION] or [COMPLIANCE] annotations
   const actionBlocks = parsed.codeBlocks.filter(
@@ -575,6 +583,61 @@ export async function orchestrate(
                 fixesViolation: v.article,
                 fixesViolationTitle: v.title,
                 patchType: 'compliance' as const,
+              })),
+            }
+          }
+        }
+
+        // Fallback 3: intelligent gap-filling — ensure every violation has a patch
+        {
+          const violations = totalComplianceFindings.filter((f) => !f.passed)
+          const fixedArticles = new Set(
+            (data?.patches ?? [])
+              .filter((p) => p.fixesViolation)
+              .map((p) => p.fixesViolation),
+          )
+          const missingPatches: HealPatch[] = []
+          for (const v of violations) {
+            if (!fixedArticles.has(v.article)) {
+              missingPatches.push({
+                file: 'compliance-fix.tf',
+                original: `# TODO: Manual fix required for ${v.article} - ${v.title}`,
+                patched: `# NOTE: Auto-fix unavailable for ${v.article}\n# ${v.remediation ? `Recommended: ${v.remediation}` : 'Manual remediation required'}`,
+                reasoning: v.remediation ?? `No auto-fix available for ${v.article}. Manual intervention required.`,
+                fixesViolation: v.article,
+                fixesViolationTitle: v.title,
+                advisory: true,
+                patchType: 'compliance' as const,
+              })
+            }
+          }
+          if (missingPatches.length > 0) {
+            if (data) {
+              data.patches.push(...missingPatches)
+            } else {
+              data = { patches: missingPatches }
+            }
+          }
+        }
+
+        // Also try to recover individual patch objects from malformed JSON arrays
+        if (!data || data.patches.length === 0) {
+          const recovered = extractArrayItems<Record<string, unknown>>(
+            fullOutput, 'patches',
+            (obj): obj is Record<string, unknown> =>
+              typeof obj === 'object' && obj !== null && 'file' in obj && 'patched' in obj,
+          )
+          if (recovered.length > 0) {
+            data = {
+              patches: recovered.map((r) => ({
+                file: String(r.file ?? ''),
+                original: String(r.original ?? ''),
+                patched: String(r.patched ?? ''),
+                reasoning: r.reasoning ? String(r.reasoning) : undefined,
+                fixesViolation: r.fixesViolation ? String(r.fixesViolation) : undefined,
+                fixesViolationTitle: r.fixesViolationTitle ? String(r.fixesViolationTitle) : undefined,
+                patchType: (r.patchType === 'compliance' || r.patchType === 'security' ? r.patchType : 'operational') as 'operational' | 'compliance' | 'security',
+                advisory: r.advisory === true,
               })),
             }
           }

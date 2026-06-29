@@ -9,6 +9,78 @@ const JSON_BLOCK_RE = /<json\s*>([\s\S]*?)<\/json\s*>/gi
 const CODE_BLOCK_RE = /```(\w+)?[^\n]*\n([\s\S]*?)```/gi
 const MERMAID_BLOCK_RE = /```mermaid\s*\n([\s\S]*?)```/gi
 
+export function tryParseJson(text: string): unknown {
+  const attempt = (s: string) => {
+    try { return JSON.parse(s) }
+    catch { return null }
+  }
+
+  const result = attempt(text)
+  if (result) return result
+
+  let cleaned = text
+
+  cleaned = cleaned.replace(/\/\/.*$/gm, '')
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '')
+
+  cleaned = cleaned.replace(/,\s*([}\]])/g, '$1')
+  cleaned = cleaned.replace(/,\s*([}\]])/g, '$1')
+
+  const result2 = attempt(cleaned)
+  if (result2) return result2
+
+  cleaned = cleaned.replace(/([{,]\s*)([a-zA-Z_$][\w$]*)\s*:/g, '$1"$2":')
+
+  const result3 = attempt(cleaned)
+  if (result3) return result3
+
+  return null
+}
+
+function splitTopLevelBraces(text: string): string[] {
+  const items: string[] = []
+  let depth = 0
+  let inString = false
+  let start = -1
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (ch === '\\') i++
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') { inString = true; continue }
+    if (ch === '{') {
+      if (depth === 0) start = i
+      depth++
+    } else if (ch === '}') {
+      depth--
+      if (depth === 0 && start !== -1) {
+        items.push(text.slice(start, i + 1))
+        start = -1
+      }
+    }
+  }
+  return items
+}
+
+export function extractArrayItems<T>(rawText: string, itemKey: string, validate: (obj: unknown) => obj is T): T[] {
+  const arrMatch = new RegExp(`"${itemKey}"\\s*:\\s*\\[([\\s\\S]*?)\\]\\s*[,\\}]`, 'i').exec(rawText)
+  if (!arrMatch) return []
+
+  const items: T[] = []
+  const objects = splitTopLevelBraces(arrMatch[1])
+  for (const objStr of objects) {
+    const trimmed = objStr.trim()
+    if (!trimmed.startsWith('{')) continue
+    const parsed = tryParseJson(trimmed)
+    if (parsed && typeof parsed === 'object' && validate(parsed)) {
+      items.push(parsed as T)
+    }
+  }
+  return items
+}
+
 export function parseAgentOutput(output: string): ParsedAgentOutput {
   const jsonBlocks: Record<string, unknown>[] = []
   const codeBlocks: { language: string; code: string }[] = []
@@ -23,8 +95,12 @@ export function parseAgentOutput(output: string): ParsedAgentOutput {
       const firstBrace = trimmed.indexOf('{')
       const lastBrace = trimmed.lastIndexOf('}')
       if (firstBrace !== -1 && lastBrace > firstBrace) {
-        const parsed = JSON.parse(trimmed.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>
-        jsonBlocks.push(parsed)
+        const parsed = tryParseJson(trimmed.slice(firstBrace, lastBrace + 1)) as Record<string, unknown> | null
+        if (parsed) {
+          jsonBlocks.push(parsed)
+        } else {
+          console.warn('[Parser] Invalid JSON in <json> tag (could not repair)')
+        }
       }
     } catch (e) {
       console.warn('[Parser] Invalid JSON in <json> tag:', (e as Error).message)
@@ -53,22 +129,14 @@ export function extractFirstJson<T = Record<string, unknown>>(output: string): T
   const jsonCodeBlockRE = /```(?:json)?\s*\n([\s\S]*?)```/gi
   let match: RegExpExecArray | null
   while ((match = jsonCodeBlockRE.exec(output)) !== null) {
-    try {
-      const parsed = JSON.parse(match[1].trim()) as T
-      if (parsed && typeof parsed === 'object') return parsed
-    } catch {
-      // try next block
-    }
+    const parsed = tryParseJson(match[1].trim()) as T | null
+    if (parsed && typeof parsed === 'object') return parsed
   }
 
   const standaloneRE = /\{[\s\S]*?"\w+"[\s\S]*?\}/g
   while ((match = standaloneRE.exec(output)) !== null) {
-    try {
-      const parsed = JSON.parse(match[0]) as T
-      if (parsed && typeof parsed === 'object' && Object.keys(parsed as object).length > 1) return parsed
-    } catch {
-      // try next match
-    }
+    const parsed = tryParseJson(match[0]) as T | null
+    if (parsed && typeof parsed === 'object' && Object.keys(parsed as object).length > 1) return parsed
   }
 
   return null

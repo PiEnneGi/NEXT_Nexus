@@ -161,6 +161,7 @@ export interface HealPatch {
   fixesViolation?: string;
   fixesViolationTitle?: string;
   patchType?: 'operational' | 'compliance' | 'security';
+  advisory?: boolean;
 }
 
 export interface HealData {

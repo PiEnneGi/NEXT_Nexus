@@ -4,7 +4,179 @@ import type {
   DiffLine,
 } from '@shared/types'
 
-const MOCK_DIAGRAM = `<svg width="800" height="400" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+const AGENT_CODE_LINES: Record<AgentId, string[]> = {
+  search: [
+    `# Agent 1/8 — Search: discovering infrastructure requirements`,
+    `# Analyzing input: "Deploy a scalable web application on AWS"`,
+    `# Found: VPC, subnets, security groups, load balancer, auto-scaling`,
+    `# Generating Terraform configuration...`,
+    ``,
+  ],
+  layout: [
+    `# Agent 2/8 — Layout: designing network topology`,
+    `resource "aws_vpc" "nexus" {`,
+    `  cidr_block           = "10.0.0.0/16"`,
+    `  enable_dns_support   = true`,
+    `  enable_dns_hostnames = true`,
+    `  tags = { Name = "nexus-vpc" }`,
+    `}`,
+    ``,
+    `resource "aws_subnet" "public_a" {`,
+    `  vpc_id                  = aws_vpc.nexus.id`,
+    `  cidr_block              = "10.0.1.0/24"`,
+    `  availability_zone       = "us-east-1a"`,
+    `  map_public_ip_on_launch = true`,
+    `}`,
+    ``,
+  ],
+  codeXml: [
+    `# Agent 3/8 — Code/XML: defining security groups & WAF`,
+    `resource "aws_security_group" "alb" {`,
+    `  name        = "nexus-alb-sg"`,
+    `  description = "Security group for ALB"`,
+    `  vpc_id      = aws_vpc.nexus.id`,
+    ``,
+    `  ingress {`,
+    `    from_port   = 443`,
+    `    to_port     = 443`,
+    `    protocol    = "tcp"`,
+    `    cidr_blocks = ["0.0.0.0/0"]`,
+    `  }`,
+    ``,
+    `  egress {`,
+    `    from_port   = 0`,
+    `    to_port     = 0`,
+    `    protocol    = "-1"`,
+    `    cidr_blocks = ["0.0.0.0/0"]`,
+    `  }`,
+    `}`,
+    ``,
+  ],
+  shieldCheck: [
+    `# Agent 4/8 — Shield: enabling DDoS protection`,
+    `resource "aws_shield_protection" "nexus" {`,
+    `  name         = "nexus-shield"`,
+    `  resource_arn = aws_lb.nexus.arn`,
+    `}`,
+    ``,
+    `resource "aws_wafv2_web_acl" "nexus" {`,
+    `  name        = "nexus-waf"`,
+    `  scope       = "regional"`,
+    `  description = "WAF for Nexus web app"`,
+    ``,
+    `  default_action { allow {} }`,
+    ``,
+    `  rule {`,
+    `    name     = "rate-limit"`,
+    `    priority = 0`,
+    `    action   { block {} }`,
+    `    statement {`,
+    `      rate_based_statement {`,
+    `        limit              = 5000`,
+    `        aggregate_key_type = "IP"`,
+    `      }`,
+    `    }`,
+    `  }`,
+    `}`,
+    ``,
+  ],
+  zap: [
+    `# Agent 5/8 — Optimize: configuring auto-scaling & load balancing`,
+    `resource "aws_lb" "nexus" {`,
+    `  name               = "nexus-alb"`,
+    `  internal           = false`,
+    `  load_balancer_type = "application"`,
+    `  security_groups    = [aws_security_group.alb.id]`,
+    `  subnets            = [aws_subnet.public_a.id]`,
+    `}`,
+    ``,
+    `resource "aws_lb_target_group" "nexus" {`,
+    `  name     = "nexus-tg"`,
+    `  port     = 80`,
+    `  protocol = "HTTP"`,
+    `  vpc_id   = aws_vpc.nexus.id`,
+    ``,
+    `  health_check {`,
+    `    path                = "/health"`,
+    `    interval            = 30`,
+    `    healthy_threshold   = 2`,
+    `    unhealthy_threshold = 3`,
+    `  }`,
+    `}`,
+    ``,
+  ],
+  lock: [
+    `# Agent 6/8 — Security: provisioning IAM & encryption`,
+    `resource "aws_iam_role" "ecs_task" {`,
+    `  name = "nexus-ecs-task-role"`,
+    ``,
+    `  assume_role_policy = jsonencode({`,
+    `    Version = "2012-10-17"`,
+    `    Statement = [{`,
+    `      Action = "sts:AssumeRole"`,
+    `      Effect = "Allow"`,
+    `      Principal = { Service = "ecs-tasks.amazonaws.com" }`,
+    `    }]`,
+    `  })`,
+    `}`,
+    ``,
+    `resource "aws_kms_key" "nexus" {`,
+    `  description             = "Nexus encryption key"`,
+    `  deletion_window_in_days = 30`,
+    `  enable_key_rotation     = true`,
+    `}`,
+    ``,
+  ],
+  fileText: [
+    `# Agent 7/8 — Docs: generating outputs & tagging strategy`,
+    `output "vpc_id" {`,
+    `  value = aws_vpc.nexus.id`,
+    `}`,
+    ``,
+    `output "alb_dns" {`,
+    `  value = aws_lb.nexus.dns_name`,
+    `}`,
+    ``,
+    `output "waf_arn" {`,
+    `  value = aws_wafv2_web_acl.nexus.arn`,
+    `}`,
+    ``,
+    `locals {`,
+    `  environment = "production"`,
+    `  project     = "cerebras-nexus"`,
+    `  team        = "infrastructure"`,
+    `}`,
+    ``,
+  ],
+  clipboardCheck: [
+    `# Agent 8/8 — Verify: running validation checks`,
+    `# ✅ Terraform configuration is valid`,
+    `# ✅ All required providers configured (aws ~> 5.0)`,
+    `# ✅ Security groups reference valid resources`,
+    `# ✅ IAM policies follow least-privilege principle`,
+    `# ✅ Encryption enabled for all data stores`,
+    `# ✅ WAF rate limiting configured for production`,
+    `#`,
+    `# Architecture ready for deployment.`,
+    ``,
+  ],
+}
+
+const AGENT_ORDER: AgentId[] = [
+  'search', 'layout', 'codeXml', 'shieldCheck',
+  'zap', 'lock', 'fileText', 'clipboardCheck',
+]
+
+export function startMockPipeline(
+  onCodeLine: (line: string) => void,
+  onProgress: (agentId: AgentId, progress: number, status: string) => void,
+  onComplete: (result: ArchitectureResult) => void,
+) {
+  let step = 0
+  let lineIndex = 0
+  let progressTimer: ReturnType<typeof setInterval> | null = null
+
+  const MOCK_DIAGRAM = `<svg width="800" height="400" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="800" height="400" fill="#0D0D0D" rx="12"/>
   <rect x="50" y="60" width="160" height="80" rx="8" fill="#1A1A1A" stroke="#FF6B00" stroke-width="2"/>
   <text x="130" y="108" text-anchor="middle" fill="#FF6B00" font-family="monospace" font-size="13">API Gateway</text>
@@ -27,89 +199,67 @@ const MOCK_DIAGRAM = `<svg width="800" height="400" viewBox="0 0 800 400" xmlns=
   <line x1="480" y1="260" x2="590" y2="260" stroke="#1A1A1A" stroke-width="2"/>
 </svg>`
 
-const MOCK_CODE = `// Architecture generated by Cerebras Nexus
-// Agents: search → layout → codeXml → shield → optimize → security → docs → verify
+  const MOCK_DIFF: DiffLine[] = [
+    { type: 'unchanged', content: '# Cerebras Nexus Architecture', lineNumber: 1 },
+    { type: 'added', content: '+ resource "aws_vpc" "nexus" { cidr_block = "10.0.0.0/16" }', lineNumber: 2 },
+    { type: 'unchanged', content: '# previous: manual VPC creation', lineNumber: 3 },
+    { type: 'removed', content: '- # TODO: create VPC manually', lineNumber: 4 },
+    { type: 'added', content: '+ resource "aws_wafv2_web_acl" "nexus" { rate_limit = 5000 }', lineNumber: 5 },
+    { type: 'unchanged', content: '# security baseline', lineNumber: 6 },
+    { type: 'removed', content: '- # TODO: add WAF rules', lineNumber: 7 },
+  ]
 
-const apiGateway = new Gateway({
-  port: 8080,
-  middleware: [rateLimit, auth, cors],
-})
-
-const orchestrator = new Orchestrator({
-  services: [microserviceA, microserviceB],
-  strategy: 'circuit-breaker',
-})
-
-const cache = new CacheLayer({
-  provider: 'redis',
-  ttl: 3600,
-})
-
-const db = new Database({
-  type: 'postgresql',
-  replica: 2,
-})`
-
-const MOCK_DIFF: DiffLine[] = [
-  { type: 'unchanged', content: '// Cerebras Nexus Architecture', lineNumber: 1 },
-  { type: 'added', content: '+ const apiGateway = new Gateway({ port: 8080 })', lineNumber: 2 },
-  { type: 'unchanged', content: '// previous: Express app', lineNumber: 3 },
-  { type: 'removed', content: '- const app = express()', lineNumber: 4 },
-  { type: 'added', content: '+ const orchestrator = new Orchestrator({', lineNumber: 5 },
-  { type: 'added', content: '+   services: [microserviceA, microserviceB]', lineNumber: 6 },
-  { type: 'added', content: '+ })', lineNumber: 7 },
-  { type: 'unchanged', content: 'const cache = new CacheLayer({ provider: "redis" })', lineNumber: 8 },
-  { type: 'removed', content: '- // TODO: add caching', lineNumber: 9 },
-]
-
-const AGENT_ORDER: AgentId[] = [
-  'search',
-  'layout',
-  'codeXml',
-  'shieldCheck',
-  'zap',
-  'lock',
-  'fileText',
-  'clipboardCheck',
-]
-
-export function runMockPipeline(
-  input: string,
-  onProgress: (agentId: AgentId, progress: number, status: string) => void,
-): Promise<ArchitectureResult> {
-  return new Promise((resolve) => {
-    let step = 0
-
-    const tick = () => {
-      if (step >= AGENT_ORDER.length) {
-        resolve({
-          diagramSvg: MOCK_DIAGRAM,
-          code: MOCK_CODE,
-          diffLines: MOCK_DIFF,
-          compliance: { gdpr: true, details: ['Data encryption at rest', 'Access logging enabled'] },
-          security: { passed: 12, failed: 0, warnings: ['Review CORS policy'] },
-          validation: { valid: true, errors: [] },
-        })
-        return
-      }
-
-      const agentId = AGENT_ORDER[step]
-      onProgress(agentId, 0, 'working')
-
-      let pct = 0
-      const interval = setInterval(() => {
-        pct += 8
-        if (pct >= 100) {
-          clearInterval(interval)
-          onProgress(agentId, 100, 'done')
-          step++
-          setTimeout(tick, 200)
-        } else {
-          onProgress(agentId, pct, 'working')
-        }
-      }, 100)
+  const advanceAgent = () => {
+    if (step >= AGENT_ORDER.length) {
+      if (progressTimer) clearInterval(progressTimer)
+      const allCode = AGENT_ORDER.flatMap((id) => AGENT_CODE_LINES[id]).join('\n')
+      onComplete({
+        diagramSvg: MOCK_DIAGRAM,
+        code: allCode,
+        diffLines: MOCK_DIFF,
+        compliance: {
+          gdpr: true,
+          details: ['Data encryption at rest (KMS)', 'Access logging enabled (CloudTrail)', 'Data isolation via VPC'],
+        },
+        security: { passed: 14, failed: 0, warnings: ['Review ALB access logs retention', 'Enable AWS Config rules'] },
+        validation: { valid: true, errors: [] },
+      })
+      return
     }
 
-    setTimeout(tick, 500)
-  })
+    const agentId = AGENT_ORDER[step]
+    const lines = AGENT_CODE_LINES[agentId]
+    lineIndex = 0
+
+    onProgress(agentId, 0, 'working')
+
+    let pct = 0
+    progressTimer = setInterval(() => {
+      pct += 2
+      const capped = Math.min(pct, 100)
+      onProgress(agentId, capped, 'working')
+      if (pct >= 100 && progressTimer) {
+        clearInterval(progressTimer)
+      }
+    }, 60)
+
+    const streamNextLine = () => {
+      if (lineIndex < lines.length) {
+        const line = lines[lineIndex]
+        onCodeLine(line)
+        lineIndex++
+        const delay = line.trim() === '' ? 50 : line.startsWith('#') ? 40 : 120
+        setTimeout(streamNextLine, delay)
+      } else {
+        if (progressTimer) clearInterval(progressTimer)
+        onProgress(agentId, 100, 'done')
+        step++
+        setTimeout(advanceAgent, 350)
+      }
+    }
+
+    streamNextLine()
+  }
+
+  advanceAgent()
 }

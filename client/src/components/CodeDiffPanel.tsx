@@ -1,14 +1,24 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { DiffLine } from '@shared/types'
 
 interface Props {
   code: string | null
   diffLines: DiffLine[] | null
+  streamedCode: string
 }
 
-export function CodeDiffPanel({ code, diffLines }: Props) {
+export function CodeDiffPanel({ code, diffLines, streamedCode }: Props) {
   const [tab, setTab] = useState<'code' | 'diff'>('code')
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [streamedCode])
+
+  const displayCode = streamedCode || code || '// No code generated yet'
 
   return (
     <div className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-[#1A1A1A] overflow-hidden">
@@ -34,17 +44,17 @@ export function CodeDiffPanel({ code, diffLines }: Props) {
           Visual Diff
         </button>
       </div>
-      <div className="flex-1 overflow-auto p-3 font-mono text-xs leading-6">
+      <div ref={scrollRef} className="flex-1 overflow-auto p-3 font-mono text-xs leading-6">
         <AnimatePresence mode="wait">
           {tab === 'code' ? (
             <motion.pre
               key="code"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="text-gray-300 whitespace-pre-wrap m-0"
             >
-              {code ?? '// No code generated yet'}
+              {displayCode}
             </motion.pre>
           ) : (
             <motion.div

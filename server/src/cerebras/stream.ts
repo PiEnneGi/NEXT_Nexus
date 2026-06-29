@@ -58,7 +58,7 @@ async function attemptStream({
       model: MODEL,
       messages,
       stream: true,
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0.7,
     }),
     signal,

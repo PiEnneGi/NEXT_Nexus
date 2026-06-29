@@ -1311,42 +1311,34 @@ aws lambda invoke --function-name nexus-auto-heal --payload '{"type":"alb_5xx","
 Output documentation as clean Markdown with appropriate headings.
 Use code blocks for commands and configuration snippets.
 
-After the documentation, output the tagging strategy and cost estimation in JSON:
+After the documentation, output the structured JSON with sections, readme, and ADR:
 
 <json>
 {
-  "taggingStrategy": {
-    "mandatoryTags": ["Name", "Environment", "ManagedBy", "Project", "DataClassification", "CostCenter", "Owner", "Terraform"],
-    "tagValues": {
-      "ManagedBy": "cerebras-nexus",
-      "Terraform": "true"
-    },
-    "autoTags": ["CreatedBy", "CreatedAt"],
-    "complianceMapping": {
-      "GDPR": ["DataClassification", "RetentionPeriod"],
-      "ISO27001": ["Owner", "AssetID", "Criticality"]
-    }
-  },
-  "outputs": [
+  "sections": [
     {
-      "name": "string (e.g. vpc_id)",
-      "description": "string",
-      "value": "string",
-      "sensitive": boolean
+      "title": "Runbook",
+      "content": "Incident response procedures for each critical service with health checks, common issues, auto-remediation, and escalation."
+    },
+    {
+      "title": "Tagging Strategy",
+      "content": "Mandatory tags: Name, Environment, ManagedBy, Project, DataClassification, CostCenter, Owner, Terraform. Auto-tags: CreatedBy, CreatedAt. Compliance mapping: GDPR, ISO27001."
+    },
+    {
+      "title": "Cost Estimation",
+      "content": "Monthly total in USD, breakdown by service, annual projected cost, and savings opportunities."
+    },
+    {
+      "title": "Terraform Outputs",
+      "content": "Output variables with name, description, value, and sensitivity."
     }
   ],
-  "costEstimate": {
-    "monthlyTotal": "string (USD)",
-    "breakdown": [
-      {"service": "string", "estimatedMonthly": "string", "tier": "string"}
-    ],
-    "annualProjected": "string (USD)",
-    "savingsOpportunities": ["string"]
-  },
-  "runbookEntries": number,
-  "adrs": number
+  "readme": "Full README in markdown with overview, architecture, prerequisites, quick start, environment layout, module structure, and key resources.",
+  "adr": "Architecture Decision Records in markdown or null if none."
 }
 </json>
+
+The "sections" array must contain all non-README, non-ADR documentation as title/content pairs. "readme" must be the complete README markdown. "adr" must be the complete ADR markdown or null.
 `,
   },
 

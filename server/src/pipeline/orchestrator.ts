@@ -342,12 +342,51 @@ function buildControlsFromHardener(json: Record<string, unknown>): HardenerContr
 
 function parseDocs(output: string): DocsData | null {
   const json = extractFirstJson<{ sections?: { title: string; content: string }[]; readme?: string; adr?: string | null }>(output)
-  if (!json) return null
-  return {
-    sections: json.sections ?? [],
-    readme: json.readme ?? '',
-    adr: json.adr ?? null,
+  if (json) {
+    return {
+      sections: json.sections ?? [],
+      readme: json.readme ?? '',
+      adr: json.adr ?? null,
+    }
   }
+
+  const sections: { title: string; content: string }[] = []
+  let readme = ''
+  let adr: string | null = null
+  let lastHeading = ''
+  let lastContent: string[] = []
+
+  const lines = output.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const headingMatch = line.match(/^##\s+(.+)$/)
+    if (headingMatch) {
+      if (lastHeading) {
+        sections.push({ title: lastHeading, content: lastContent.join('\n').trim() })
+      }
+      lastHeading = headingMatch[1].trim()
+      lastContent = []
+    } else {
+      lastContent.push(line)
+    }
+  }
+  if (lastHeading) {
+    sections.push({ title: lastHeading, content: lastContent.join('\n').trim() })
+  }
+
+  const readmeStart = output.search(/# Cerebras Nexus/)
+  if (readmeStart >= 0) {
+    const readmeEnd = output.indexOf('\n## ', readmeStart + 1)
+    readme = (readmeEnd >= 0 ? output.slice(readmeStart, readmeEnd) : output.slice(readmeStart)).trim()
+  }
+
+  const adrStart = output.search(/ADR-\d{3}/)
+  if (adrStart >= 0) {
+    const adrEnd = output.indexOf('\n## ', adrStart + 1)
+    adr = (adrEnd >= 0 ? output.slice(adrStart, adrEnd) : output.slice(adrStart)).trim()
+  }
+
+  return sections.length > 0 || readme ? { sections, readme, adr } : null
 }
 
 function parseValidator(output: string): ValidatorData | null {

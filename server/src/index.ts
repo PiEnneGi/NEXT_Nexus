@@ -1,4 +1,9 @@
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') })
+
 import express from 'express'
 import cors from 'cors'
 import type { Request, Response } from 'express'
@@ -25,7 +30,7 @@ app.get('/stream', (req: Request, res: Response) => {
   if (!apiKey || apiKey === 'placeholder_key_here') {
     res.status(503).json({
       error:
-        'CEREBRAS_API_KEY not configured. Set it in server/.env (see .env.example)',
+        'CEREBRAS_API_KEY not configured. Set it in .env (see .env.example)',
     })
     return
   }
@@ -70,11 +75,22 @@ app.get('/stream', (req: Request, res: Response) => {
     })
 })
 
+function checkEnv(name: string): string {
+  const val = process.env[name]
+  if (!val || val === 'placeholder_key_here') {
+    console.error(`[Nexus] MISSING: ${name} — set it in .env (see .env.example)`)
+    process.exit(1)
+  }
+  return 'configured'
+}
+
+const keyStatus = checkEnv('CEREBRAS_API_KEY')
+const urlStatus = checkEnv('CEREBRAS_API_URL')
+const modelStatus = checkEnv('CEREBRAS_MODEL')
+
 app.listen(PORT, () => {
-  const keyStatus = process.env.CEREBRAS_API_KEY
-    ? process.env.CEREBRAS_API_KEY === 'placeholder_key_here'
-      ? 'PLACEHOLDER — set real key in .env'
-      : 'configured'
-    : 'MISSING — set CEREBRAS_API_KEY in .env'
-  console.log(`[Nexus Server] http://localhost:${PORT}  |  API key: ${keyStatus}`)
+  console.log(
+    `[Nexus Server] http://localhost:${PORT}  |  ` +
+      `API key: ${keyStatus}  |  URL: ${urlStatus}  |  Model: ${modelStatus}`,
+  )
 })

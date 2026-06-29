@@ -1,5 +1,3 @@
-const CEREBRAS_API_BASE = 'https://api.cerebras.ai/v1/chat/completions'
-const MODEL = 'gemma-4-31b'
 const MAX_RETRIES = 3
 const INITIAL_DELAY_MS = 1000
 
@@ -48,14 +46,24 @@ async function attemptStream({
     throw new Error('CEREBRAS_API_KEY not configured')
   }
 
-  const response = await fetch(CEREBRAS_API_BASE, {
+  const apiUrl = process.env.CEREBRAS_API_URL
+  if (!apiUrl || apiUrl === 'placeholder_key_here') {
+    throw new Error('CEREBRAS_API_URL not configured')
+  }
+
+  const model = process.env.CEREBRAS_MODEL
+  if (!model || model === 'placeholder_key_here') {
+    throw new Error('CEREBRAS_MODEL not configured')
+  }
+
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       messages,
       stream: true,
       max_tokens: 8192,

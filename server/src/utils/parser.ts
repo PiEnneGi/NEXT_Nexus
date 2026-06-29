@@ -19,8 +19,13 @@ export function parseAgentOutput(output: string): ParsedAgentOutput {
   const jsonRE = new RegExp(JSON_BLOCK_RE.source, 'gi')
   while ((match = jsonRE.exec(output)) !== null) {
     try {
-      const parsed = JSON.parse(match[1].trim()) as Record<string, unknown>
-      jsonBlocks.push(parsed)
+      const trimmed = match[1].trim()
+      const firstBrace = trimmed.indexOf('{')
+      const lastBrace = trimmed.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const parsed = JSON.parse(trimmed.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>
+        jsonBlocks.push(parsed)
+      }
     } catch (e) {
       console.warn('[Parser] Invalid JSON in <json> tag:', (e as Error).message)
     }

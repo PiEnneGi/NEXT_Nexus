@@ -16,7 +16,13 @@ export function ValidatorReport({ data }: Props) {
       : total > 0
         ? Math.round((passed / total) * 100)
         : 0
-  const approved = data?.approved ?? displayScore >= 80
+
+  const status =
+    displayScore >= 80
+      ? { label: 'Approved', color: '#33FF77' }
+      : displayScore >= 60
+        ? { label: 'Warning', color: '#FF6B00' }
+        : { label: 'Rejected', color: '#FF3333' }
 
   return (
     <motion.div
@@ -27,15 +33,16 @@ export function ValidatorReport({ data }: Props) {
       <div className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] p-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <ClipboardCheck size={16} className={approved ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
+            <ClipboardCheck size={16} style={{ color: status.color }} />
             <span className="text-xs font-mono text-gray-300">
-              {approved ? 'Approved' : 'Rejected'}
+              {status.label}
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <TrendingUp size={13} className={displayScore >= 80 ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
+            <TrendingUp size={13} style={{ color: status.color }} />
             <span
-              className={`text-sm font-mono ${displayScore >= 80 ? 'text-[#33FF77]' : 'text-[#FF3333]'}`}
+              className="text-sm font-mono"
+              style={{ color: status.color }}
             >
               {displayScore}%
             </span>
@@ -47,7 +54,7 @@ export function ValidatorReport({ data }: Props) {
               className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${displayScore}%`,
-                backgroundColor: displayScore >= 80 ? '#33FF77' : displayScore >= 50 ? '#FF6B00' : '#FF3333',
+                backgroundColor: status.color,
               }}
             />
           </div>

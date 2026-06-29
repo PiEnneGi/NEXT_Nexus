@@ -55,7 +55,7 @@ export function CodeDiffPanel({ code, diffLines, streamedCode, defaultTab }: Pro
       <div ref={scrollRef} className="flex-1 overflow-auto p-3 font-mono text-xs leading-6">
         <AnimatePresence mode="wait">
           {tab === 'code' ? (
-            <motion.pre
+              <motion.pre
               key="code"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

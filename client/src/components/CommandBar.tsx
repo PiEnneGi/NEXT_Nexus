@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Paperclip, Send, X } from 'lucide-react'
 
@@ -61,6 +61,18 @@ export function CommandBar({ onSend, disabled }: Props) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const LINE_HEIGHT = 20
+  const MAX_VISIBLE_LINES = 5
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (el) {
+      el.style.height = 'auto'
+      el.style.height = Math.min(el.scrollHeight, MAX_VISIBLE_LINES * LINE_HEIGHT) + 'px'
+    }
+  }, [input])
 
   const addFiles = useCallback((fileList: FileList | File[]) => {
     const newFiles: AttachedFile[] = []
@@ -244,7 +256,7 @@ export function CommandBar({ onSend, disabled }: Props) {
           </div>
         )}
 
-        <div className="flex items-center gap-2 px-3 py-2">
+        <div className="flex items-end gap-2 px-3 py-2">
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => fileRef.current?.click()}
@@ -265,7 +277,8 @@ export function CommandBar({ onSend, disabled }: Props) {
             onChange={handleFileSelect}
           />
 
-          <input
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -277,7 +290,8 @@ export function CommandBar({ onSend, disabled }: Props) {
                   ? 'Add a message or send files...'
                   : 'Describe the infrastructure architecture...'
             }
-            className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 outline-none font-mono"
+            rows={1}
+            className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 outline-none font-mono resize-none overflow-y-auto"
             disabled={disabled}
           />
 

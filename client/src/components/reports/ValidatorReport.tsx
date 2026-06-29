@@ -7,8 +7,16 @@ interface Props {
 }
 
 export function ValidatorReport({ data }: Props) {
-  const passed = data.checks.filter((c) => c.passed).length
-  const total = data.checks.length
+  const checks = data?.checks ?? []
+  const passed = checks.filter((c) => c.passed).length
+  const total = checks.length
+  const displayScore =
+    (data?.score ?? 0) > 0
+      ? data.score
+      : total > 0
+        ? Math.round((passed / total) * 100)
+        : 0
+  const approved = data?.approved ?? displayScore >= 80
 
   return (
     <motion.div
@@ -19,17 +27,17 @@ export function ValidatorReport({ data }: Props) {
       <div className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] p-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <ClipboardCheck size={16} className={data.approved ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
+            <ClipboardCheck size={16} className={approved ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
             <span className="text-xs font-mono text-gray-300">
-              {data.approved ? 'Approved' : 'Rejected'}
+              {approved ? 'Approved' : 'Rejected'}
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <TrendingUp size={13} className={data.score >= 80 ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
+            <TrendingUp size={13} className={displayScore >= 80 ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
             <span
-              className={`text-sm font-mono ${data.score >= 80 ? 'text-[#33FF77]' : 'text-[#FF3333]'}`}
+              className={`text-sm font-mono ${displayScore >= 80 ? 'text-[#33FF77]' : 'text-[#FF3333]'}`}
             >
-              {data.score}%
+              {displayScore}%
             </span>
           </div>
         </div>
@@ -38,8 +46,8 @@ export function ValidatorReport({ data }: Props) {
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{
-                width: `${data.score}%`,
-                backgroundColor: data.score >= 80 ? '#33FF77' : '#FF3333',
+                width: `${displayScore}%`,
+                backgroundColor: displayScore >= 80 ? '#33FF77' : displayScore >= 50 ? '#FF6B00' : '#FF3333',
               }}
             />
           </div>
@@ -50,7 +58,7 @@ export function ValidatorReport({ data }: Props) {
       </div>
 
       <div className="space-y-1.5">
-        {data.checks.map((check, i) => (
+        {checks.map((check, i) => (
           <div
             key={i}
             className="flex items-start gap-2.5 p-2.5 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A]"
@@ -71,7 +79,7 @@ export function ValidatorReport({ data }: Props) {
             </div>
           </div>
         ))}
-        {data.checks.length === 0 && (
+        {checks.length === 0 && (
           <p className="text-xs text-gray-500 px-3 py-3">No validation checks</p>
         )}
       </div>

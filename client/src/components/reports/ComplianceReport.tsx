@@ -22,8 +22,9 @@ const severityBadge = (s: string) => {
 }
 
 export function ComplianceReport({ data }: Props) {
-  const passed = data.filter((f) => f.passed).length
-  const total = data.length
+  const findings = data ?? []
+  const passed = findings.filter((f) => f?.passed).length
+  const total = findings.length
 
   return (
     <motion.div
@@ -32,19 +33,19 @@ export function ComplianceReport({ data }: Props) {
       className="space-y-3"
     >
       <div className="flex items-center gap-2 p-3 bg-[#0D0D0D] rounded-lg border border-[#1A1A1A]">
-        <Shield size={16} className={passed === total ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
+        <Shield size={16} className={passed === total && total > 0 ? 'text-[#33FF77]' : 'text-[#FF3333]'} />
         <span className="text-xs font-mono text-gray-300">
           {passed}/{total} passed
         </span>
-        {passed === total ? (
+        {passed === total && total > 0 ? (
           <span className="text-[10px] font-mono text-[#33FF77] ml-auto">GDPR Compliant</span>
-        ) : (
+        ) : total > 0 ? (
           <span className="text-[10px] font-mono text-[#FF3333] ml-auto">Remediation Required</span>
-        )}
+        ) : null}
       </div>
 
       <div className="space-y-2">
-        {data.map((f, i) => (
+        {findings.map((f, i) => (
           <div
             key={i}
             className="bg-[#0D0D0D] rounded-lg border border-[#1A1A1A] p-3"
@@ -53,23 +54,23 @@ export function ComplianceReport({ data }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span
-                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${severityBadge(f.severity)}`}
+                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${severityBadge(f?.severity)}`}
                   >
-                    {f.severity}
+                    {f?.severity ?? 'Low'}
                   </span>
-                  {f.passed ? (
+                  {f?.passed ? (
                     <CheckCircle size={12} className="text-[#33FF77] shrink-0" />
                   ) : (
                     <XCircle size={12} className="text-[#FF3333] shrink-0" />
                   )}
                 </div>
-                <p className="text-xs font-mono text-gray-200 truncate">{f.title}</p>
+                <p className="text-xs font-mono text-gray-200 truncate">{f?.title ?? ''}</p>
               </div>
             </div>
             <p className="text-[10px] text-gray-500 font-mono mb-1">
-              <span className="text-[#FF6B00]">{f.article}</span> — {f.description}
+              <span className="text-[#FF6B00]">{f?.article ?? ''}</span> — {f?.description ?? ''}
             </p>
-            {!f.passed && f.remediation && (
+            {f && !f.passed && f.remediation && (
               <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-[#1A1A1A]">
                 <AlertTriangle size={10} className="text-[#FF6B00] mt-0.5 shrink-0" />
                 <span className="text-[10px] text-gray-400 font-mono">{f.remediation}</span>
@@ -77,7 +78,7 @@ export function ComplianceReport({ data }: Props) {
             )}
           </div>
         ))}
-        {data.length === 0 && (
+        {findings.length === 0 && (
           <p className="text-xs text-gray-500 px-3 py-3">No compliance findings</p>
         )}
       </div>

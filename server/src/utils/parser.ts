@@ -5,9 +5,9 @@ export interface ParsedAgentOutput {
   fullText: string
 }
 
-const JSON_BLOCK_RE = /<json>([\s\S]*?)<\/json>/gi
-const CODE_BLOCK_RE = /```(\w+)?\n([\s\S]*?)```/gi
-const MERMAID_BLOCK_RE = /```mermaid\n([\s\S]*?)```/gi
+const JSON_BLOCK_RE = /<json\s*>([\s\S]*?)<\/json\s*>/gi
+const CODE_BLOCK_RE = /```(\w+)?\s*\n([\s\S]*?)```/gi
+const MERMAID_BLOCK_RE = /```mermaid\s*\n([\s\S]*?)```/gi
 
 export function parseAgentOutput(output: string): ParsedAgentOutput {
   const jsonBlocks: Record<string, unknown>[] = []
@@ -21,8 +21,8 @@ export function parseAgentOutput(output: string): ParsedAgentOutput {
     try {
       const parsed = JSON.parse(match[1].trim()) as Record<string, unknown>
       jsonBlocks.push(parsed)
-    } catch {
-      console.warn('[Parser] Invalid JSON in <json> tag, skipping')
+    } catch (e) {
+      console.warn('[Parser] Invalid JSON in <json> tag:', (e as Error).message)
     }
   }
 
@@ -56,19 +56,24 @@ export function computeDiffLines(
   const result: { type: 'added' | 'removed' | 'unchanged'; content: string; lineNumber: number }[] = []
 
   const maxLen = Math.max(prevLines.length, currLines.length)
+  let lineNum = 0
   for (let i = 0; i < maxLen; i++) {
-    const lineNum = i + 1
     const prevLine = i < prevLines.length ? prevLines[i] : undefined
     const currLine = i < currLines.length ? currLines[i] : undefined
 
     if (prevLine === undefined) {
+      lineNum++
       result.push({ type: 'added', content: currLine!, lineNumber: lineNum })
     } else if (currLine === undefined) {
+      lineNum++
       result.push({ type: 'removed', content: prevLine, lineNumber: lineNum })
     } else if (prevLine !== currLine) {
+      lineNum++
       result.push({ type: 'removed', content: prevLine, lineNumber: lineNum })
+      lineNum++
       result.push({ type: 'added', content: currLine, lineNumber: lineNum })
     } else {
+      lineNum++
       result.push({ type: 'unchanged', content: prevLine, lineNumber: lineNum })
     }
   }

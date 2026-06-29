@@ -9,9 +9,17 @@ interface Props {
   pipelineStatus: 'idle' | 'running' | 'complete' | 'error'
   currentAgent?: AgentId
   agentIndex?: number
+  onExportPDF?: () => void
 }
 
-export function Header({ onToggleAssurance, assuranceOpen, pipelineStatus, currentAgent, agentIndex }: Props) {
+export function Header({
+  onToggleAssurance,
+  assuranceOpen,
+  pipelineStatus,
+  currentAgent,
+  agentIndex,
+  onExportPDF,
+}: Props) {
   return (
     <header className="fixed top-0 left-16 right-0 h-12 bg-[#0D0D0D] border-b border-[#1A1A1A] flex items-center justify-between px-5 z-40">
       <div className="flex items-center gap-4">
@@ -29,8 +37,10 @@ export function Header({ onToggleAssurance, assuranceOpen, pipelineStatus, curre
           totalAgents={8}
         />
         <motion.button
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/30 hover:bg-[#FF6B00]/20 transition-colors"
+          onClick={onExportPDF}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/30 hover:bg-[#FF6B00]/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           whileTap={{ scale: 0.95 }}
+          disabled={pipelineStatus !== 'complete'}
         >
           <FileDown size={13} />
           Export Official PDF

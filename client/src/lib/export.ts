@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import type { ArchitectureResult, AgentReport } from '@shared/types'
 
 export function downloadSVG(svgContent: string, filename = 'architecture.svg') {
   const blob = new Blob([svgContent], { type: 'image/svg+xml' })
@@ -12,7 +13,7 @@ export function downloadSVG(svgContent: string, filename = 'architecture.svg') {
 }
 
 export function downloadPNG(
-  elementOrSvg: HTMLElement | string,
+  elementOrSvg: HTMLElement | SVGElement | string,
   filename = 'architecture.png',
   scale = 2,
 ): Promise<void> {
@@ -44,21 +45,38 @@ export function downloadPNG(
       img.onerror = () => reject(new Error('Image load failed'))
       img.src = url
     } else {
-      html2canvas(elementOrSvg, { scale, backgroundColor: '#050505' })
-        .then((canvas) => {
-          canvas.toBlob((b) => {
-            if (b) {
-              const a = document.createElement('a')
-              a.href = URL.createObjectURL(b)
-              a.download = filename
-              a.click()
-              resolve()
-            } else {
-              reject(new Error('Canvas toBlob failed'))
-            }
-          }, 'image/png')
-        })
-        .catch(reject)
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(elementOrSvg)
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width * scale
+        canvas.height = img.height * scale
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { reject(new Error('Canvas context unavailable')); return }
+        ctx.scale(scale, scale)
+        ctx.drawImage(img, 0, 0)
+        canvas.toBlob((b) => {
+          if (b) {
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(b)
+            a.download = filename
+            a.click()
+            resolve()
+          } else {
+            reject(new Error('Canvas toBlob failed'))
+          }
+        }, 'image/png')
+        URL.revokeObjectURL(url)
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        reject(new Error('SVG image load failed (foreignObject may not render)'))
+      }
+      img.src = url
     }
   })
 }
@@ -93,10 +111,10 @@ export async function downloadPDF(
   pdf.save(filename)
 }
 
-export async function downloadEnterprisePDF(
-  title: string,
-  subtitle: string,
-  sections: { label: string; content: string }[],
+export async function exportPipelinePDF(
+  result: ArchitectureResult | null,
+  agentReports: Partial<Record<string, AgentReport>>,
+  userInput: string,
   filename = 'cerebras-nexus-report.pdf',
 ) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -106,12 +124,59 @@ export async function downloadEnterprisePDF(
   const contentW = pageW - margin * 2
   let y = margin
 
-  const nexusOrange = '#FF6B00'
-  const nexusLime = '#CCFF00'
-  const nexusGreen = '#33FF77'
-  const darkBg = '#050505'
-  const darkSurface = '#0D0D0D'
-  const borderColor = '#1A1A1A'
+  const sections: { label: string; content: string }[] = [
+    {
+      label: 'Original Request',
+      content: userInput || 'N/A',
+    },
+    {
+      label: 'Compliance Status',
+      content: result
+        ? `GDPR: ${result.compliance.gdpr ? 'Compliant' : 'Non-Compliant'}\nFindings: ${result.compliance.details.join('\n')}`
+        : 'No compliance data',
+    },
+    {
+      label: 'Security Overview',
+      content: result
+        ? `Passed: ${result.security.passed} | Failed: ${result.security.failed}\nWarnings: ${result.security.warnings.join('\n')}`
+        : 'No security data',
+    },
+    {
+      label: 'Validation',
+      content: result
+        ? `Valid: ${result.validation.valid ? 'Yes' : 'No'}\nErrors: ${result.validation.errors.join('\n') || 'None'}`
+        : 'No validation data',
+    },
+  ]
+
+  const agentLabels: Record<string, string> = {
+    search: 'Analyze — Requirements',
+    shieldCheck: 'Compliance — GDPR Findings',
+    zap: 'Auto-Heal — Patches Applied',
+    lock: 'Hardener — Security Controls',
+    fileText: 'Docs — Documentation',
+    clipboardCheck: 'Validator — Scorecard',
+  }
+
+  for (const [agentId, report] of Object.entries(agentReports)) {
+    if (report) {
+      let content = ''
+      if (report.type === 'analyze') {
+        const d = report.data as any
+        content = `RPO: ${d.rpo} | RTO: ${d.rto}\nRequirements: ${(d.requirements ?? []).length} items\nServices: ${(d.services ?? []).join(', ')}`
+      } else if (report.type === 'validator') {
+        const d = report.data as any
+        content = `Score: ${d.score}% | Approved: ${d.approved ? 'Yes' : 'No'}\nChecks: ${(d.checks ?? []).map((c: any) => `${c.name}: ${c.passed ? 'PASS' : 'FAIL'}`).join('\n')}`
+      } else {
+        content = JSON.stringify(report.data, null, 2)
+        if (content.length > 500) content = content.slice(0, 500) + '...'
+      }
+      sections.push({
+        label: agentLabels[agentId] || `${report.agentName} Report`,
+        content,
+      })
+    }
+  }
 
   function drawBackground() {
     pdf.setFillColor(5, 5, 5)
@@ -120,26 +185,21 @@ export async function downloadEnterprisePDF(
 
   function drawHeaderSection() {
     const headerH = 50
-
     pdf.setFillColor(13, 13, 13)
     pdf.rect(0, 0, pageW, headerH, 'F')
-
     pdf.setDrawColor(255, 107, 0)
     pdf.setLineWidth(0.5)
     pdf.line(0, headerH, pageW, headerH)
-
     pdf.setFillColor(255, 107, 0)
     pdf.rect(margin, 12, 4, 26, 'F')
-
     pdf.setTextColor(204, 255, 0)
     pdf.setFontSize(18)
     pdf.setFont('helvetica', 'bold')
-    pdf.text(title, margin + 12, 26)
-
+    pdf.text('Cerebras Nexus — Architecture Report', margin + 12, 26)
     pdf.setTextColor(136, 136, 136)
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'normal')
-    pdf.text(subtitle, margin + 12, 36)
+    pdf.text('Automated Infrastructure Audit — Generated by Gemma-4-31B', margin + 12, 36)
   }
 
   function drawSectionCard(label: string, content: string, startY: number): number {

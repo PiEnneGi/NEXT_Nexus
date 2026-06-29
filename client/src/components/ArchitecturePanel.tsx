@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Download, FileImage } from 'lucide-react'
 import mermaid from 'mermaid'
@@ -26,7 +26,7 @@ interface Props {
 export function ArchitecturePanel({ diagramSvg, diagramMermaid }: Props) {
   const [renderedSvg, setRenderedSvg] = useState<string | null>(diagramSvg)
   const [isRendering, setIsRendering] = useState(false)
-  const mermaidContainerRef = useRef<HTMLDivElement>(null)
+  const svgContainerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -53,15 +53,29 @@ export function ArchitecturePanel({ diagramSvg, diagramMermaid }: Props) {
     setRenderedSvg(null)
   }, [diagramSvg, diagramMermaid])
 
+  const getDomSvg = useCallback((): SVGElement | null => {
+    if (!svgContainerRef.current) return null
+    const svgEl = svgContainerRef.current.querySelector('svg')
+    return svgEl
+  }, [])
+
   const handleExportSVG = () => {
-    if (renderedSvg) {
+    const domSvg = getDomSvg()
+    if (domSvg) {
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(domSvg)
+      downloadSVG(svgString)
+    } else if (renderedSvg) {
       downloadSVG(renderedSvg)
     }
   }
 
-  const handleExportPNG = () => {
-    if (renderedSvg) {
-      downloadPNG(renderedSvg)
+  const handleExportPNG = async () => {
+    const domSvg = getDomSvg()
+    if (domSvg) {
+      await downloadPNG(domSvg)
+    } else if (renderedSvg) {
+      await downloadPNG(renderedSvg)
     }
   }
 
@@ -99,7 +113,7 @@ export function ArchitecturePanel({ diagramSvg, diagramMermaid }: Props) {
           </div>
         ) : renderedSvg ? (
           <div
-            ref={mermaidContainerRef}
+            ref={svgContainerRef}
             className="w-full h-full flex items-center justify-center"
             dangerouslySetInnerHTML={{ __html: renderedSvg }}
           />

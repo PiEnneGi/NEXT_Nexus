@@ -1,5 +1,5 @@
-import type { AgentId, ArchitectureResult, DiffLine, AgentReport, AnalyzeData, ComplianceFinding, HealData, HealPatch, HardenerData, HardenerControl, ValidatorData, ValidatorCheck, DocsData } from '@shared/types'
-import { AGENT_PROMPTS_LIST, type AgentPrompt } from '../agents/prompts.js'
+import type { AgentId, ArchitectureResult, DiffLine, AgentReport, AnalyzeData, LayoutData, CodeXmlData, ComplianceFinding, HealData, HealPatch, HardenerData, HardenerControl, ValidatorData, ValidatorCheck, DocsData } from '@shared/types'
+import { AGENT_PROMPTS_LIST } from '../agents/prompts.js'
 import { streamCerebras } from '../cerebras/stream.js'
 import type { ChatMessage } from '../cerebras/stream.js'
 import { parseAgentOutput, extractFirstJson, computeDiffLines } from '../utils/parser.js'
@@ -44,7 +44,7 @@ function parseAnalyze(output: string): AnalyzeData | null {
   }>(output)
   if (!json) return null
   return {
-    requirements: (json.requirements ?? []).map((r: { name?: string; value?: string; priority?: string }) => ({
+    requirements: (json.requirements ?? []).map((r) => ({
       name: r.name ?? '',
       value: r.value ?? '',
       priority: (r.priority === 'P0' || r.priority === 'P1' || r.priority === 'P2' ? r.priority : 'P2') as 'P0' | 'P1' | 'P2',
@@ -59,6 +59,37 @@ function parseCompliance(output: string): ComplianceFinding[] | null {
   const json = extractFirstJson<{ findings?: ComplianceFinding[] }>(output)
   if (!json?.findings) return null
   return json.findings
+}
+
+function parseLayout(output: string): LayoutData | null {
+  const json = extractFirstJson<{
+    architecture?: string
+    services?: string[]
+    zones?: number
+  }>(output)
+  if (!json) return null
+  return {
+    architecture: json.architecture ?? '',
+    services: json.services ?? [],
+    zones: json.zones ?? 0,
+  }
+}
+
+function parseCodeXml(output: string): CodeXmlData | null {
+  const json = extractFirstJson<{
+    modules?: { name: string; type: string }[]
+    language?: string
+  }>(output)
+  if (!json) return null
+  const parsed = parseAgentOutput(output)
+  const codeBlock = parsed.codeBlocks.find(
+    (b) => b.language === 'hcl' || b.language === 'terraform' || b.language === 'yaml',
+  )
+  return {
+    code: codeBlock?.code ?? '',
+    language: json.language ?? codeBlock?.language ?? 'hcl',
+    modules: json.modules ?? [],
+  }
 }
 
 function parseHeal(output: string): HealData | null {
@@ -88,16 +119,26 @@ function parseDocs(output: string): DocsData | null {
 }
 
 function parseValidator(output: string): ValidatorData | null {
-  const json = extractFirstJson<{ checks?: ValidatorCheck[]; score?: number; approved?: boolean }>(output)
+  const json = extractFirstJson<{
+    checks?: ValidatorCheck[]
+    score?: number
+    finalScore?: number
+    approved?: boolean
+    valid?: boolean
+  }>(output)
   if (!json?.checks) return null
   return {
     checks: json.checks,
-    score: json.score ?? 0,
-    approved: json.approved ?? false,
+    score: json.score ?? json.finalScore ?? 0,
+    approved: json.approved ?? json.valid ?? false,
   }
 }
 
-export async function orchestrate(userInput: string, emit: SSECallback, signal?: AbortSignal): Promise<void> {
+export async function orchestrate(
+  userInput: string,
+  emit: SSECallback,
+  signal?: AbortSignal,
+): Promise<void> {
   let context = ''
   let previousCode = ''
   let allDiffLines: DiffLine[] = []
@@ -107,6 +148,7 @@ export async function orchestrate(userInput: string, emit: SSECallback, signal?:
   let hardenerResult: HardenerData | null = null
   let validatorResult: ValidatorData | null = null
   let currentCode = ''
+  let agent3Code = ''
 
   for (let i = 0; i < AGENT_PROMPTS_LIST.length; i++) {
     const agent = AGENT_PROMPTS_LIST[i]
@@ -148,6 +190,15 @@ export async function orchestrate(userInput: string, emit: SSECallback, signal?:
       mermaidSource = parsed.mermaidBlocks[parsed.mermaidBlocks.length - 1]
     }
 
+    if (agent.id === 'codeXml') {
+      const codeBlock = parsed.codeBlocks.find(
+        (b) => b.language === 'hcl' || b.language === 'terraform',
+      )
+      if (codeBlock) {
+        agent3Code = codeBlock.code
+      }
+    }
+
     const codeBlock = parsed.codeBlocks.find(
       (b) => b.language === 'hcl' || b.language === 'terraform' || b.language === 'yaml',
     )
@@ -171,6 +222,34 @@ export async function orchestrate(userInput: string, emit: SSECallback, signal?:
         }
         break
       }
+      case 'layout': {
+        const parsedOutput = parseAgentOutput(fullOutput)
+        const services: string[] = []
+        if (parsedOutput.mermaidBlocks.length > 0) {
+          const mermaid = parsedOutput.mermaidBlocks[0]
+          const serviceMatches = mermaid.match(/(?:EKS|RDS|ECS|Lambda|S3|DynamoDB|ElastiCache|CloudFront|Route53|VPC|EC2|ALB|API Gateway|SQS|SNS|Kinesis|Step Functions|CodePipeline|CloudWatch|IAM|KMS|WAF|Shield|Aurora|Neptune|DocumentDB|MSK|EMR|Redshift|Elasticsearch|OpenSearch|Fargate|AppSync|x1b\[[A-Za-z]+)/g)
+          if (serviceMatches) {
+            serviceMatches.forEach((s) => {
+              const clean = s.replace(/x1b\[[A-Za-z]+/, '')
+              if (!services.includes(clean)) services.push(clean)
+            })
+          }
+        }
+        const data: LayoutData = {
+          architecture: parsedOutput.mermaidBlocks[0] ?? 'No diagram',
+          services,
+          zones: 3,
+        }
+        agentReport = { agentId: 'layout', agentName: label, type: 'layout', data }
+        break
+      }
+      case 'codeXml': {
+        const data = parseCodeXml(fullOutput)
+        if (data) {
+          agentReport = { agentId: 'codeXml', agentName: label, type: 'codeXml', data }
+        }
+        break
+      }
       case 'shieldCheck': {
         const data = parseCompliance(fullOutput)
         if (data) {
@@ -183,6 +262,17 @@ export async function orchestrate(userInput: string, emit: SSECallback, signal?:
         const data = parseHeal(fullOutput)
         if (data) {
           agentReport = { agentId: 'zap', agentName: label, type: 'heal', data }
+
+          for (const patch of data.patches) {
+            const patchRef = agent3Code || currentCode
+            if (patch.original && patch.patched) {
+              const patchDiffs = computeDiffLines(patch.original, patch.patched)
+              allDiffLines.push(
+                { type: 'unchanged', content: `# --- Patch: ${patch.file} ---`, lineNumber: 0 },
+                ...patchDiffs,
+              )
+            }
+          }
         }
         break
       }
@@ -202,6 +292,9 @@ export async function orchestrate(userInput: string, emit: SSECallback, signal?:
         break
       }
       case 'clipboardCheck': {
+        const validatorCtx = context
+        context = validatorCtx
+
         const data = parseValidator(fullOutput)
         if (data) {
           validatorResult = data

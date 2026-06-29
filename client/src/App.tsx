@@ -1,9 +1,11 @@
+import { useCallback } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { Workspace } from './components/Workspace'
 import { CommandBar } from './components/CommandBar'
 import { AssuranceSidebar } from './components/AssuranceSidebar'
 import { usePipelineStore } from './hooks/usePipelineStore'
+import { exportPipelinePDF } from './lib/export'
 
 export default function App() {
   const agentsState = usePipelineStore((s) => s.agentsState)
@@ -19,6 +21,15 @@ export default function App() {
   const toggleAssurance = usePipelineStore((s) => s.toggleAssurance)
   const selectAgent = usePipelineStore((s) => s.selectAgent)
   const startPipeline = usePipelineStore((s) => s.startPipeline)
+  const setActiveDiffView = usePipelineStore((s) => s.setActiveDiffView)
+
+  const handleExportPDF = useCallback(() => {
+    const state = usePipelineStore.getState()
+    const input = state.streamedCode
+      ? state.streamedCode.slice(0, 200)
+      : 'Infrastructure request'
+    exportPipelinePDF(state.result, state.agentReports, input)
+  }, [])
 
   return (
     <div className="h-screen flex flex-col bg-[#050505] overflow-hidden">
@@ -33,6 +44,7 @@ export default function App() {
         pipelineStatus={pipelineStatus}
         currentAgent={currentAgentId ?? undefined}
         agentIndex={currentAgentIndex}
+        onExportPDF={handleExportPDF}
       />
 
       <div className="flex flex-1 pt-12 ml-16 min-h-0">
@@ -49,6 +61,12 @@ export default function App() {
           selectedAgentId={selectedAgentId}
           agentReports={agentReports}
           onClose={() => selectAgent(null)}
+          resultCode={result?.code}
+          onShowMermaid={() => {
+            selectAgent(null)
+            toggleAssurance()
+          }}
+          onShowDiff={() => setActiveDiffView(true)}
         />
       </div>
 

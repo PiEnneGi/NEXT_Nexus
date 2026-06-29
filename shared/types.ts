@@ -59,8 +59,8 @@ export interface ValidationReport {
 export interface AgentReport {
   agentId: AgentId;
   agentName: string;
-  type: 'analyze' | 'compliance' | 'heal' | 'hardener' | 'docs' | 'validator';
-  data: AnalyzeData | ComplianceFinding[] | HealData | HardenerData | DocsData | ValidatorData;
+  type: 'analyze' | 'layout' | 'codeXml' | 'compliance' | 'heal' | 'hardener' | 'docs' | 'validator';
+  data: AnalyzeData | LayoutData | CodeXmlData | ComplianceFinding[] | HealData | HardenerData | DocsData | ValidatorData;
 }
 
 export interface AnalyzeData {
@@ -68,6 +68,18 @@ export interface AnalyzeData {
   rpo: string;
   rto: string;
   services: string[];
+}
+
+export interface LayoutData {
+  architecture: string;
+  services: string[];
+  zones: number;
+}
+
+export interface CodeXmlData {
+  code: string;
+  language: string;
+  modules: { name: string; type: string }[];
 }
 
 export interface ComplianceFinding {
@@ -93,14 +105,15 @@ export interface HardenerData {
   total: number;
 }
 
-export interface HealData {
-  patches: HealPatch[];
-}
-
 export interface HealPatch {
   file: string;
   original: string;
   patched: string;
+  reasoning?: string;
+}
+
+export interface HealData {
+  patches: HealPatch[];
 }
 
 export interface ValidatorCheck {

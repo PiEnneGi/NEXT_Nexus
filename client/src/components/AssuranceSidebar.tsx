@@ -243,11 +243,11 @@ export function AssuranceSidebar({
         <motion.aside
           key="assurance-sidebar"
           initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 320, opacity: 1 }}
+          animate={{ width: 480, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeInOut' }}
           layout="position"
-          className="h-full bg-[#0D0D0D] border-l border-[#1A1A1A] overflow-hidden flex flex-col shrink-0"
+          className="h-full bg-[#0D0D0D] border-l border-[#1A1A1A] overflow-hidden flex flex-col shrink-0 overflow-x-hidden"
         >
           {selectedAgentId ? (
             <>

@@ -92,11 +92,15 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   toggleAssurance: () => set((s) => ({ isAssuranceOpen: !s.isAssuranceOpen })),
 
   selectAgent: (id) =>
-    set((s) => ({
-      selectedAgentId: s.selectedAgentId === id ? null : id,
-      isAssuranceOpen: s.selectedAgentId === id ? false : true,
-      activeDiffView: s.selectedAgentId === id ? false : id === 'zap',
-    })),
+    set((s) => {
+      const isSame = s.selectedAgentId === id
+      const keepClosed = id === 'layout' || id === 'codeXml'
+      return {
+        selectedAgentId: isSame ? null : id,
+        isAssuranceOpen: isSame ? false : keepClosed ? false : true,
+        activeDiffView: isSame ? false : id === 'zap',
+      }
+    }),
 
   setActiveDiffView: (active) => set({ activeDiffView: active }),
 

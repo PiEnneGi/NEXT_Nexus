@@ -776,42 +776,110 @@ Simulate each of these failure modes against every resource you generate:
   - Auto-heal: verify CA chain, check certificate revocation list, check SAN matching
   - Patch: API Gateway mTLS configuration with trust store; set minimum_protocol_version = TLSv1.2
 
-================================================================================
-3. OUTPUT FORMAT — PATCHED CODE + RISK ASSESSMENT
-================================================================================
+===============================================================================
+3. COMPLIANCE VIOLATION REMEDIATION — FIX SHIELD FINDINGS
+===============================================================================
 
-For each resource modified, output:
+IMPORTANT: The previous agent (Compliance/Shield) identified compliance violations
+against GDPR, ISO 27001, SOC 2, and HIPAA. These violations are listed in the
+context under "COMPLIANCE VIOLATIONS TO FIX" or in the compliance agent output.
+
+You MUST:
+
+a) Read ALL compliance violations from the context. For each non-passed finding:
+   - Identify which infrastructure resource is affected
+   - Generate a patch that fixes the specific violation
+   - The patch must show the EXACT original non-compliant code and the patched compliant code
+
+b) Common compliance violations and their fixes:
+
+   GDPR Art. 5(1)(f) / 32(1)(a) — Missing encryption at rest:
+     - Original: no server_side_encryption_configuration on S3 bucket
+     - Patched: add server_side_encryption_configuration with aws:kms
+
+   GDPR Art. 5(1)(e) — Missing data retention policy:
+     - Original: no lifecycle_rule on S3 bucket
+     - Patched: add lifecycle_rule with expiration and transition rules
+
+   GDPR Art. 25 — Missing data protection by design:
+     - Original: no encryption on ElastiCache / RDS
+     - Patched: enable encryption at rest and in transit
+
+   GDPR Art. 32(1)(d) — Missing audit logging:
+     - Original: no CloudTrail / no CloudWatch Logs export
+     - Patched: enable CloudTrail, enable CloudWatch logs export on RDS/Lambda
+
+   ISO 27001 A.9 — Weak access control:
+     - Original: overly permissive IAM policy (Action: "*")
+     - Patched: scoped IAM policy with specific actions and conditions
+
+   ISO 27001 A.12.4.1 — Missing VPC Flow Logs:
+     - Original: no flow log configuration on VPC
+     - Patched: add aws_flow_log resource
+
+   GDPR Art. 17 — Missing right-to-erasure mechanism:
+     - Original: no backup retention policy or deletion protection
+     - Patched: add lifecycle rules, configure deletion protection
+
+c) For EACH compliance patch, include the exact \`original\` code block (the current
+   non-compliant Terraform resource) and the \`patched\` code block (the fixed version).
+   Set \`patchType\` to "compliance" and include the violation article in \`fixesViolation\`.
+
+===============================================================================
+4. OUTPUT FORMAT — PATCHED CODE + RISK ASSESSMENT
+===============================================================================
+
+For each resource modified (both operational and compliance), output:
 
 \`\`\`hcl:patched-resource.tf
 # [THINK] Resource aws_lb.nexus may experience connection timeouts under load
 # [THINK] Root cause: idle_timeout default is 60s, but webhooks may take >60s
-# [THINK] Also predicting ALB 502 errors during rolling deployment (deregistration delay = 30s default)
 # [THINK] Auto-remediation: increase idle_timeout to 120s and deregistration_delay to 120s
 # [ACTION] Patching aws_lb.nexus with increased timeouts
 resource "aws_lb" "nexus" {
   # ... existing config ...
-  idle_timeout                   = 120  # increased from 60
-  # [VERIFY] Starting simulation of patch...
-  # [VERIFY] Connection timeout at 65s: no longer occurs (idle_timeout = 120s)
-  # [VERIFY] Rolling deploy 502 errors: eliminated (deregistration_delay covers in-flight requests)
-  # [VERIFY] Patch verified — 2 failure modes mitigated
+  idle_timeout = 120
+  deregistration_delay = 120
 }
 \`\`\`
 
-After all patches, output the JSON risk assessment:
+For compliance fixes, use the same format but reference the regulation:
+
+\`\`\`hcl:patched-s3.tf
+# [COMPLIANCE] Fixing GDPR Art. 32(1)(a): missing encryption on S3 bucket
+# [THINK] aws_s3_bucket.nexus_assets has no server_side_encryption_configuration
+# [ACTION] Adding SSE-KMS encryption
+resource "aws_s3_bucket" "nexus_assets" {
+  bucket = var.bucket_name
+  # ... existing config ...
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "aws:kms"
+      }
+    }
+  }
+}
+\`\`\`
+
+After all code blocks, output the JSON risk assessment. The JSON MUST use "patches"
+(array name) with objects containing file, original, patched, reasoning, fixesViolation.
+
+CRITICAL: Use EXACTLY the field names below — no variations.
 
 <json>
 {
   "failureModesSimulated": number,
   "failureModesMitigated": number,
-  "patchesApplied": [
+  "patches": [
     {
-      "resource": "string",
-      "failureMode": "string",
-      "severity": "critical" | "high" | "medium" | "low",
-      "patchType": "config" | "additionalResource" | "alarm" | "policy",
-      "confidence": "high" | "medium" | "low",
-      "estimatedEffectiveness": "string (e.g. 95% reduction in timeout errors)"
+      "file": "string (e.g. main.tf)",
+      "original": "string (EXACT original non-compliant code block)",
+      "patched": "string (EXACT patched code block with fix applied)",
+      "reasoning": "string (explanation of what was fixed and why)",
+      "fixesViolation": "string|null (e.g. GDPR Art. 32(1)(a), or null for operational patches)",
+      "fixesViolationTitle": "string|null (e.g. S3 bucket missing encryption)",
+      "patchType": "operational" | "compliance" | "security"
     }
   ],
   "remainingRisks": [
@@ -830,6 +898,13 @@ After all patches, output the JSON risk assessment:
   ]
 }
 </json>
+
+FAILURE RULES:
+- The \`patches\` array is MANDATORY. Use an empty array if no patches were needed.
+- Each patch MUST have both \`original\` and \`patched\` as strings of actual code.
+- \`fixesViolation\` MUST match the article string from the compliance findings.
+- If a patch fixes a compliance issue, set \`patchType\` to "compliance".
+- Output ALL patches in the <json> tags at the end, after all code blocks.
 `,
   },
 

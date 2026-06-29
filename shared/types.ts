@@ -110,6 +110,9 @@ export interface HealPatch {
   original: string;
   patched: string;
   reasoning?: string;
+  fixesViolation?: string;
+  fixesViolationTitle?: string;
+  patchType?: 'operational' | 'compliance' | 'security';
 }
 
 export interface HealData {

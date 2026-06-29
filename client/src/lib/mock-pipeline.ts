@@ -247,7 +247,8 @@ export function startMockPipeline(
       agentId: 'zap', agentName: 'Auto-Heal', type: 'heal',
       data: {
         patches: [
-          { file: 'main.tf', original: 'instance_type = "t2.micro"', patched: 'instance_type = "t3.medium"', reasoning: 'Upgrade instance type for production workload' },
+          { file: 'main.tf', original: 'instance_type = "t2.micro"', patched: 'instance_type = "t3.medium"', reasoning: 'Upgrade instance type for production workload', patchType: 'operational' },
+          { file: 's3.tf', original: 'resource "aws_s3_bucket" "assets" {\n  bucket = "nexus-assets"\n}', patched: 'resource "aws_s3_bucket" "assets" {\n  bucket = "nexus-assets"\n  server_side_encryption_configuration {\n    rule {\n      apply_server_side_encryption_by_default {\n        sse_algorithm = "aws:kms"\n      }\n    }\n  }\n}', reasoning: 'Added SSE-KMS encryption to fix GDPR Art. 32(1)(a) violation', fixesViolation: 'GDPR-32', fixesViolationTitle: 'Data encryption at rest', patchType: 'compliance' },
         ],
       },
     },

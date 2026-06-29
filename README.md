@@ -1,4 +1,4 @@
-# ⚡ Cerebras Nexus — Mission Control
+# ⚡ Cerebras Nexus
 
 [![Powered by Cerebras](https://img.shields.io/badge/Powered%20by-Cerebras-FF4F00?style=for-the-badge&logo=cerebras )](https://cerebras.net/ )
 [![Powered by Gemma4](https://img.shields.io/badge/Model-Gemma4-blue?style=for-the-badge )](https://ai.google.dev/gemma )

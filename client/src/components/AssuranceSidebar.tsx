@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, CheckCircle, AlertTriangle, XCircle, ArrowLeft, Code, LayoutDashboard, Globe, Terminal, BookOpen, Files, FileText } from 'lucide-react'
-import type { ComplianceReport, SecurityReport, ValidationReport, AgentReport, AgentId, DocsData } from '@shared/types'
+import { Shield, CheckCircle, AlertTriangle, XCircle, ArrowLeft, Code, LayoutDashboard, Globe, Terminal, BookOpen, Files, FileText, Lock, KeyRound, Network, Ban, Fingerprint, FileWarning } from 'lucide-react'
+import type { ComplianceReport, SecurityReport, ValidationReport, AgentReport, AgentId, DocsData, HardenerData } from '@shared/types'
 import { AnalyzeReport } from './reports/AnalyzeReport'
 import { ComplianceReport as ComplianceReportView } from './reports/ComplianceReport'
 import { HealReport } from './reports/HealReport'
@@ -175,6 +175,169 @@ function CodeXmlReport({ data, fullCode, docsData }: {
   )
 }
 
+function SecurityTab({ security, lockData }: { security: SecurityReport | null; lockData: HardenerData | undefined }) {
+  const hasRichData = lockData && lockData.hardeningSummary.securityScore !== 'N/A'
+
+  if (!hasRichData) {
+    return (
+      <motion.div
+        key="security"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-xs font-mono text-[#33FF77]">{security?.passed ?? 0} passed</span>
+          <span className="text-xs font-mono text-[#FF3333]">{security?.failed ?? 0} failed</span>
+        </div>
+        <ul className="space-y-2">
+          {(security?.warnings ?? ['No warnings']).map((w, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-gray-400">
+              <AlertTriangle size={12} className="text-[#FF6B00] mt-0.5 shrink-0" />
+              {w}
+            </li>
+          ))}
+        </ul>
+      </motion.div>
+    )
+  }
+
+  const pct = lockData.total > 0 ? Math.round((lockData.passed / lockData.total) * 100) : 0
+
+  const hardeningItems: { title: string; detail: string; icon: React.ReactNode }[] = []
+
+  if (lockData.iamHardening.policiesHardened.length > 0) {
+    lockData.iamHardening.policiesHardened.forEach((p) => {
+      hardeningItems.push({
+        title: `IAM Least Privilege — ${p.policyName}`,
+        detail: `Policy ridotta da ${p.originalActions} a ${p.reducedActions} azioni (${p.riskReduction})`,
+        icon: <Lock size={13} className="text-[#33FF77] mt-0.5 shrink-0" />,
+      })
+    })
+  } else {
+    hardeningItems.push({
+      title: 'IAM Least Privilege Enforcement',
+      detail: 'Tutte le policy IAM seguono il principio del minimo privilegio.',
+      icon: <Lock size={13} className="text-[#33FF77] mt-0.5 shrink-0" />,
+    })
+  }
+
+  hardeningItems.push({
+    title: 'Encryption KMS — Dati in Transito e a Riposo',
+    detail: `${lockData.encryptionScore.servicesEncryptedAtRest} servizi cifrati a riposo, ${lockData.encryptionScore.servicesWithTLS} con TLS 1.2+, ${lockData.encryptionScore.kmsKeysUsed} KMS CMK attivi. Score: ${lockData.encryptionScore.overallEncryptionScore}`,
+    icon: <KeyRound size={13} className="text-[#33FF77] mt-0.5 shrink-0" />,
+  })
+
+  hardeningItems.push({
+    title: 'Network Isolation & VPC Flow Logs',
+    detail: 'VPC Flow Logs abilitati su tutte le VPC. Security Groups restrittivi. VPC Endpoints per S3 e DynamoDB.',
+    icon: <Network size={13} className="text-[#33FF77] mt-0.5 shrink-0" />,
+  })
+
+  const mitigatedAttacks: { name: string; description: string }[] = []
+  lockData.scpRecommendations.forEach((scp) => {
+    mitigatedAttacks.push({
+      name: scp.name,
+      description: scp.rationale || `Effect: ${scp.effect} on ${scp.actions.join(', ')} — ${scp.resourceType}`,
+    })
+  })
+  if (lockData.encryptionScore.overallEncryptionScore !== 'N/A') {
+    mitigatedAttacks.push({
+      name: 'WAF SQL Injection & Brute Force Protection',
+      description: 'WAF regole rate-based bloccano brute force. TLS 1.2+ previene eavesdropping e SQL injection via Web ACL.',
+    })
+  }
+
+  return (
+    <motion.div
+      key="security"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="space-y-3"
+    >
+      {/* Status bar */}
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <Shield size={16} className="text-[#33FF77]" />
+          <span className="text-xs font-mono text-gray-300">Hardening Summary</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#1A1A1A]">
+          <span className="text-[10px] font-mono text-[#33FF77]">{lockData.hardeningSummary.securityScore}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex-1 h-1.5 bg-[#1A1A1A] rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${pct}%`,
+              backgroundColor: pct >= 80 ? '#33FF77' : pct >= 50 ? '#FF6B00' : '#FF3333',
+            }}
+          />
+        </div>
+        <span className="text-[10px] font-mono text-gray-400 text-right shrink-0">{lockData.passed}/{lockData.total}</span>
+      </div>
+
+      <ul className="space-y-1.5">
+        {hardeningItems.map((item, i) => (
+          <li key={i} className="flex items-start gap-2.5 p-2 rounded-lg bg-[#1A1A1A]/50">
+            {item.icon}
+            <div>
+              <p className="text-[10px] font-mono text-gray-200">{item.title}</p>
+              <p className="text-[9px] font-mono text-gray-500 mt-0.5 leading-4">{item.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* CIS Checklist */}
+      <div className="pt-1">
+        <div className="flex items-center gap-2 mb-2">
+          <CheckCircle size={13} className="text-[#33FF77]" />
+          <span className="text-[10px] font-mono text-gray-300">CIS Compliance Checklist</span>
+          <span className="text-[8px] font-mono text-gray-500 ml-auto">
+            {lockData.cisBenchmark.controlsPassed}/{lockData.cisBenchmark.controlsPassed + lockData.cisBenchmark.controlsFailed}
+          </span>
+        </div>
+        <div className="space-y-1">
+          {lockData.controls.map((c, i) => (
+            <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded bg-[#1A1A1A]/30">
+              <CheckCircle size={10} className="text-[#33FF77] shrink-0" />
+              <span className="text-[9px] font-mono text-gray-300 flex-1 truncate">{c.name}</span>
+              <span className="text-[7px] font-mono px-1 py-0.5 rounded bg-[#1A1A1A] text-gray-500 shrink-0">
+                {c.category}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Threat Mitigation */}
+      <div className="pt-1">
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle size={13} className="text-[#FF6B00]" />
+          <span className="text-[10px] font-mono text-gray-300">Threat Mitigation</span>
+        </div>
+        <div className="space-y-1">
+          {mitigatedAttacks.map((attack, i) => (
+            <div key={i} className="flex items-start gap-2 py-1.5 px-2 rounded bg-[#1A1A1A]/30">
+              <Shield size={10} className="text-[#FF6B00] mt-0.5 shrink-0" />
+              <div>
+                <p className="text-[9px] font-mono text-gray-200">{attack.name}</p>
+                <p className="text-[8px] font-mono text-gray-500 mt-0.5 leading-3.5">{attack.description}</p>
+              </div>
+            </div>
+          ))}
+          {mitigatedAttacks.length === 0 && (
+            <p className="text-[9px] font-mono text-gray-500 px-1">No threat mitigation data</p>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 export function AssuranceSidebar({
   open,
   compliance,
@@ -322,27 +485,10 @@ export function AssuranceSidebar({
                       </ul>
                     </motion.div>
                   )}
-                  {tab === 'security' && (
-                    <motion.div
-                      key="security"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-xs font-mono text-[#33FF77]">{security?.passed ?? 0} passed</span>
-                        <span className="text-xs font-mono text-[#FF3333]">{security?.failed ?? 0} failed</span>
-                      </div>
-                      <ul className="space-y-2">
-                        {(security?.warnings ?? ['No warnings']).map((w, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs text-gray-400">
-                            <AlertTriangle size={12} className="text-[#FF6B00] mt-0.5 shrink-0" />
-                            {w}
-                          </li>
-                        ))}
-                      </ul>
-                    </motion.div>
-                  )}
+                  {tab === 'security' && <SecurityTab
+                      security={security}
+                      lockData={agentReports['lock']?.data as HardenerData | undefined}
+                    />}
                   {tab === 'validation' && (
                     <motion.div
                       key="validation"

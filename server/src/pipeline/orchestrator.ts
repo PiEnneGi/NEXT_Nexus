@@ -239,13 +239,105 @@ function parseHeal(output: string): HealData | null {
 }
 
 function parseHardener(output: string): HardenerData | null {
-  const json = extractFirstJson<{ controls?: HardenerControl[]; passed?: number; total?: number }>(output)
-  if (!json?.controls) return null
+  const json = extractFirstJson<{
+    controls?: HardenerControl[];
+    passed?: number;
+    total?: number;
+    cisBenchmark?: { version?: string; level?: string; controlsPassed?: number; controlsFailed?: number; coverage?: string };
+    scpRecommendations?: Array<{ name: string; effect: string; actions: string[]; rationale: string; resourceType: string }>;
+    iamHardening?: { policiesReviewed?: number; overPrivilegedPoliciesFound?: number; policiesHardened?: Array<{ policyName: string; originalActions: number; reducedActions: number; riskReduction: string }> };
+    encryptionScore?: { servicesEncryptedAtRest?: number; servicesWithTLS?: number; kmsKeysUsed?: number; overallEncryptionScore?: string };
+    hardeningSummary?: { totalFindings?: number; criticalFindings?: number; highFindings?: number; mediumFindings?: number; lowFindings?: number; securityScore?: string };
+  }>(output)
+  if (!json) return null
+
+  const controls = json.controls ?? buildControlsFromHardener(json)
+  const passed = json.passed ?? json.cisBenchmark?.controlsPassed ?? 0
+  const total = json.total ?? passed + (json.cisBenchmark?.controlsFailed ?? 0)
+
   return {
-    controls: json.controls,
-    passed: json.passed ?? 0,
-    total: json.total ?? json.controls.length,
+    controls,
+    passed,
+    total: Math.max(total, passed),
+    hardeningSummary: {
+      totalFindings: json.hardeningSummary?.totalFindings ?? 0,
+      criticalFindings: json.hardeningSummary?.criticalFindings ?? 0,
+      highFindings: json.hardeningSummary?.highFindings ?? 0,
+      mediumFindings: json.hardeningSummary?.mediumFindings ?? 0,
+      lowFindings: json.hardeningSummary?.lowFindings ?? 0,
+      securityScore: json.hardeningSummary?.securityScore ?? 'N/A',
+    },
+    cisBenchmark: {
+      version: json.cisBenchmark?.version ?? '3.0.0',
+      level: json.cisBenchmark?.level ?? '1',
+      controlsPassed: json.cisBenchmark?.controlsPassed ?? passed,
+      controlsFailed: json.cisBenchmark?.controlsFailed ?? (total - passed),
+      coverage: json.cisBenchmark?.coverage ?? 'Not reported',
+    },
+    scpRecommendations: (json.scpRecommendations ?? []).map((s) => ({
+      name: s.name,
+      effect: s.effect === 'Allow' ? 'Allow' : 'Deny',
+      actions: s.actions ?? [],
+      rationale: s.rationale ?? '',
+      resourceType: s.resourceType ?? '',
+    })),
+    iamHardening: {
+      policiesReviewed: json.iamHardening?.policiesReviewed ?? 0,
+      overPrivilegedPoliciesFound: json.iamHardening?.overPrivilegedPoliciesFound ?? 0,
+      policiesHardened: (json.iamHardening?.policiesHardened ?? []).map((p) => ({
+        policyName: p.policyName ?? '',
+        originalActions: p.originalActions ?? 0,
+        reducedActions: p.reducedActions ?? 0,
+        riskReduction: p.riskReduction ?? '',
+      })),
+    },
+    encryptionScore: {
+      servicesEncryptedAtRest: json.encryptionScore?.servicesEncryptedAtRest ?? 0,
+      servicesWithTLS: json.encryptionScore?.servicesWithTLS ?? 0,
+      kmsKeysUsed: json.encryptionScore?.kmsKeysUsed ?? 0,
+      overallEncryptionScore: json.encryptionScore?.overallEncryptionScore ?? 'N/A',
+    },
   }
+}
+
+function buildControlsFromHardener(json: Record<string, unknown>): HardenerControl[] {
+  const controls: HardenerControl[] = []
+  const bm = json.cisBenchmark as Record<string, unknown> | undefined
+  const iam = json.iamHardening as Record<string, unknown> | undefined
+  const enc = json.encryptionScore as Record<string, unknown> | undefined
+
+  if (bm) {
+    const cf = (bm.controlsFailed as number) ?? 0
+    controls.push({
+      id: 'CIS-BENCHMARK',
+      name: 'CIS AWS Foundations Benchmark Compliance',
+      category: 'Compliance',
+      applied: cf === 0,
+      description: `Version ${(bm.version as string) ?? '3.0.0'} — ${(bm.coverage as string) ?? `${(bm.controlsPassed as number) ?? 0}/${((bm.controlsPassed as number) ?? 0) + cf} controls passed`}`,
+    })
+  }
+  if (iam) {
+    const hardened = (iam.policiesHardened as Array<Record<string, unknown>>) ?? []
+    hardened.forEach((p, i) => {
+      controls.push({
+        id: `IAM-H-${i + 1}`,
+        name: `Hardened: ${(p.policyName as string) ?? 'unknown'}`,
+        category: 'IAM',
+        applied: true,
+        description: `Reduced from ${(p.originalActions as number) ?? 0} to ${(p.reducedActions as number) ?? 0} actions — ${(p.riskReduction as string) ?? ''}`,
+      })
+    })
+  }
+  if (enc) {
+    controls.push({
+      id: 'ENC-SCORE',
+      name: 'Encryption Standards Compliance',
+      category: 'Encryption',
+      applied: true,
+      description: `${(enc.servicesEncryptedAtRest as number) ?? 0} services encrypted at rest, ${(enc.servicesWithTLS as number) ?? 0} with TLS, ${(enc.kmsKeysUsed as number) ?? 0} KMS keys — Score: ${(enc.overallEncryptionScore as string) ?? 'N/A'}`,
+    })
+  }
+  return controls
 }
 
 function parseDocs(output: string): DocsData | null {
@@ -474,7 +566,14 @@ export async function orchestrate(
         }
         agentReport = {
           agentId: 'lock', agentName: label, type: 'hardener',
-          data: data ?? { controls: [], passed: 0, total: 0 },
+          data: data ?? {
+            controls: [], passed: 0, total: 0,
+            hardeningSummary: { totalFindings: 0, criticalFindings: 0, highFindings: 0, mediumFindings: 0, lowFindings: 0, securityScore: 'N/A' },
+            cisBenchmark: { version: '3.0.0', level: '1', controlsPassed: 0, controlsFailed: 0, coverage: 'Not reported' },
+            scpRecommendations: [],
+            iamHardening: { policiesReviewed: 0, overPrivilegedPoliciesFound: 0, policiesHardened: [] },
+            encryptionScore: { servicesEncryptedAtRest: 0, servicesWithTLS: 0, kmsKeysUsed: 0, overallEncryptionScore: 'N/A' },
+          },
         }
         break
       }

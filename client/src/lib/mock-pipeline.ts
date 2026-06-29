@@ -256,11 +256,47 @@ export function startMockPipeline(
       agentId: 'lock', agentName: 'Hardener', type: 'hardener',
       data: {
         controls: [
-          { id: 'IAM-01', name: 'Least privilege IAM roles', category: 'Identity', applied: true, description: 'IAM roles follow least-privilege principle' },
-          { id: 'ENC-01', name: 'Encryption at rest', category: 'Encryption', applied: true, description: 'KMS encryption enabled for all data stores' },
-          { id: 'LOG-01', name: 'Audit logging', category: 'Logging', applied: false, description: 'CloudTrail logging for API calls' },
+          { id: 'CI-01', name: 'CIS 1.4 — CloudTrail Enabled', category: 'Logging', applied: true, description: 'CloudTrail abilitato in tutte le regioni con log file validation' },
+          { id: 'CI-02', name: 'CIS 2.1.1 — S3 Public Access Blocked', category: 'Storage', applied: true, description: 'Blocco accesso pubblico su tutti i bucket S3' },
+          { id: 'CI-03', name: 'CIS 4.3 — No Root Account Usage', category: 'IAM', applied: true, description: 'Nessuna access key per l\'account root' },
+          { id: 'CI-04', name: 'CIS 4.2 — MFA Enabled', category: 'IAM', applied: true, description: 'MFA abilitato per tutti gli utenti IAM con console access' },
+          { id: 'CI-05', name: 'CIS 5.2 — EBS Encryption', category: 'Storage', applied: true, description: 'Volumi EBS cifrati con KMS CMK' },
+          { id: 'CI-06', name: 'CIS 3.3 — VPC Flow Logs', category: 'Network', applied: true, description: 'VPC Flow Logs attivi su tutte le VPC' },
         ],
-        passed: 2, total: 3,
+        passed: 6, total: 6,
+        hardeningSummary: {
+          totalFindings: 18, criticalFindings: 0, highFindings: 2,
+          mediumFindings: 5, lowFindings: 11, securityScore: '87/100',
+        },
+        cisBenchmark: {
+          version: '3.0.0', level: '2', controlsPassed: 14,
+          controlsFailed: 0, coverage: '14/14 controlli applicabili superati',
+        },
+        scpRecommendations: [
+          { name: 'DenyCloudTrailChanges', effect: 'Deny',
+            actions: ['cloudtrail:StopLogging', 'cloudtrail:DeleteTrail', 'cloudtrail:UpdateTrail'],
+            rationale: 'Previene la disabilitazione dell\'audit trail da parte di account non autorizzati',
+            resourceType: 'cloudtrail' },
+          { name: 'DenyEC2WithoutIMDSv2', effect: 'Deny',
+            actions: ['ec2:RunInstances'],
+            rationale: 'Forza l\'uso di IMDSv2 su tutte le istanze EC2 per prevenire SSRF',
+            resourceType: 'ec2' },
+          { name: 'EnforceMFA', effect: 'Deny',
+            actions: ['*'],
+            rationale: 'Nega tutte le operazioni API senza MFA, eccetto la creazione di dispositivi MFA',
+            resourceType: 'iam' },
+        ],
+        iamHardening: {
+          policiesReviewed: 12, overPrivilegedPoliciesFound: 3,
+          policiesHardened: [
+            { policyName: 'ecs-task-execution-role', originalActions: 145, reducedActions: 38, riskReduction: '-73% privilegi' },
+            { policyName: 'lambda-execution-role', originalActions: 87, reducedActions: 22, riskReduction: '-74% privilegi' },
+          ],
+        },
+        encryptionScore: {
+          servicesEncryptedAtRest: 6, servicesWithTLS: 5,
+          kmsKeysUsed: 3, overallEncryptionScore: '95/100',
+        },
       },
     },
     fileText: {
@@ -300,7 +336,7 @@ export function startMockPipeline(
           gdpr: true,
           details: ['Data encryption at rest (KMS)', 'Access logging enabled (CloudTrail)', 'Data isolation via VPC'],
         },
-        security: { passed: 14, failed: 0, warnings: ['Review ALB access logs retention', 'Enable AWS Config rules'] },
+        security: { passed: 6, failed: 0, warnings: [] },
         validation: { valid: true, errors: [] },
         agentReports: MOCK_AGENT_REPORTS,
       })

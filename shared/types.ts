@@ -99,10 +99,58 @@ export interface HardenerControl {
   description: string;
 }
 
+export interface HardeningSummary {
+  totalFindings: number;
+  criticalFindings: number;
+  highFindings: number;
+  mediumFindings: number;
+  lowFindings: number;
+  securityScore: string;
+}
+
+export interface CisBenchmark {
+  version: string;
+  level: string;
+  controlsPassed: number;
+  controlsFailed: number;
+  coverage: string;
+}
+
+export interface ScpRecommendation {
+  name: string;
+  effect: 'Deny' | 'Allow';
+  actions: string[];
+  rationale: string;
+  resourceType: string;
+}
+
+export interface IamHardening {
+  policiesReviewed: number;
+  overPrivilegedPoliciesFound: number;
+  policiesHardened: Array<{
+    policyName: string;
+    originalActions: number;
+    reducedActions: number;
+    riskReduction: string;
+  }>;
+}
+
+export interface EncryptionScore {
+  servicesEncryptedAtRest: number;
+  servicesWithTLS: number;
+  kmsKeysUsed: number;
+  overallEncryptionScore: string;
+}
+
 export interface HardenerData {
   controls: HardenerControl[];
   passed: number;
   total: number;
+  hardeningSummary: HardeningSummary;
+  cisBenchmark: CisBenchmark;
+  scpRecommendations: ScpRecommendation[];
+  iamHardening: IamHardening;
+  encryptionScore: EncryptionScore;
 }
 
 export interface HealPatch {
